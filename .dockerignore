@@ -4,6 +4,7 @@ target/
 .vscode/
 *.log
 /studify.db
+/studify-*.db
 .env
 .env.local
 .DS_Store
