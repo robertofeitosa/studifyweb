@@ -1,0 +1,9 @@
+target/
+.git/
+.github/
+.vscode/
+*.log
+/studify.db
+.env
+.env.local
+.DS_Store

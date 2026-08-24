@@ -1,0 +1,5 @@
+target/
+/studify.db
+*.log
+.env
+.env.local
