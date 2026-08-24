@@ -145,350 +145,108 @@
                 </div>
 
                 <div class="steps">
-                    <div>
-                        <b>1</b>
-                        <span>Escolha o conteúdo.</span>
-                    </div>
-
-                    <div>
-                        <b>2</b>
-                        <span>Estude usando o timer.</span>
-                    </div>
-
-                    <div>
-                        <b>3</b>
-                        <span>Registre notas e revisões.</span>
-                    </div>
-
-                    <div>
-                        <b>4</b>
-                        <span>Solidifique o que dominou.</span>
-                    </div>
+                    <div><b>1</b><span>Escolha o conteúdo.</span></div>
+                    <div><b>2</b><span>Estude usando o timer.</span></div>
+                    <div><b>3</b><span>Registre notas e revisões.</span></div>
+                    <div><b>4</b><span>Solidifique o que dominou.</span></div>
                 </div>
             </article>
 
             <div class="home-grid">
                 <article class="card quick-card reveal delay-4">
                     <h3>Acesso rápido</h3>
-
                     <div class="quick-actions">
-                        <button
-                            class="quick-action"
-                            onclick="goToPage('timer')"
-                        >
-                            <span>◷</span>
-                            Iniciar estudo
-                        </button>
-
-                        <button
-                            class="quick-action"
-                            onclick="goToPage('notes')"
-                        >
-                            <span>✎</span>
-                            Criar nota
-                        </button>
-
-                        <button
-                            class="quick-action"
-                            onclick="goToPage('reviews')"
-                        >
-                            <span>↻</span>
-                            Ver revisões
-                        </button>
+                        <button class="quick-action" onclick="goToPage('timer')"><span>◷</span>Iniciar estudo</button>
+                        <button class="quick-action" onclick="goToPage('notes')"><span>✎</span>Criar nota</button>
+                        <button class="quick-action" onclick="goToPage('reviews')"><span>↻</span>Ver revisões</button>
                     </div>
                 </article>
 
                 <article class="card quick-card reveal delay-5">
                     <h3>Objetivo</h3>
-                    <p class="muted">
-                        Não marque como solidificado só porque leu.
-                        Marque quando conseguir explicar e resolver sem ajuda.
-                    </p>
+                    <p class="muted">Não marque como solidificado só porque leu. Marque quando conseguir explicar e resolver sem ajuda.</p>
                 </article>
             </div>
         </section>
 
         <section id="contents" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Conteúdos</h2>
-                    <p>Estude e acompanhe cada tópico.</p>
-                </div>
-            </div>
-
+            <div class="page-header"><div><h2>Conteúdos</h2><p>Estude e acompanhe cada tópico.</p></div></div>
             <article class="card">
                 <div class="toolbar">
                     <select id="subjectSelect"></select>
-
-                    <button
-                        class="primary"
-                        id="newSubjectBtn"
-                    >
-                        + Nova matéria
-                    </button>
-
-                    <button
-                        class="primary"
-                        id="newContentBtn"
-                    >
-                        + Adicionar conteúdo
-                    </button>
+                    <button class="primary" id="newSubjectBtn">+ Nova matéria</button>
+                    <button class="primary" id="newContentBtn">+ Adicionar conteúdo</button>
                 </div>
-
-                <div
-                    id="javaRoadmap"
-                    class="java-roadmap hidden"
-                ></div>
-
-                <div
-                    id="contentList"
-                    class="content-list"
-                ></div>
+                <div id="javaRoadmap" class="java-roadmap hidden"></div>
+                <div id="contentList" class="content-list"></div>
             </article>
         </section>
 
         <section id="organize" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Organizar</h2>
-                    <p>
-                        Edite nomes e mude a ordem das matérias
-                        e conteúdos.
-                    </p>
-                </div>
-            </div>
-
+            <div class="page-header"><div><h2>Organizar</h2><p>Edite nomes e mude a ordem das matérias e conteúdos.</p></div></div>
             <div class="organize-grid">
-                <article class="card">
-                    <h3>Matérias</h3>
-
-                    <div
-                        id="subjectManageList"
-                        class="manage-list"
-                    ></div>
-                </article>
-
-                <article class="card">
-                    <div class="organize-head">
-                        <h3>Conteúdos</h3>
-
-                        <select
-                            id="organizeSubjectSelect"
-                        ></select>
-                    </div>
-
-                    <div
-                        id="contentManageList"
-                        class="manage-list"
-                    ></div>
-                </article>
+                <article class="card"><h3>Matérias</h3><div id="subjectManageList" class="manage-list"></div></article>
+                <article class="card"><div class="organize-head"><h3>Conteúdos</h3><select id="organizeSubjectSelect"></select></div><div id="contentManageList" class="manage-list"></div></article>
             </div>
         </section>
 
         <section id="reviews" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Revisões</h2>
-                    <p>Volte aos assuntos na hora certa.</p>
-                </div>
-            </div>
-
-            <article class="card">
-                <div
-                    id="reviewList"
-                    class="review-list"
-                ></div>
-            </article>
+            <div class="page-header"><div><h2>Revisões</h2><p>Volte aos assuntos na hora certa.</p></div></div>
+            <article class="card"><div id="reviewList" class="review-list"></div></article>
         </section>
 
         <section id="notes" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Notas</h2>
-                    <p>
-                        Registre observações, dúvidas e resumos.
-                    </p>
-                </div>
-
-                <button
-                    id="newNoteBtn"
-                    class="primary"
-                >
-                    + Nova nota
-                </button>
-            </div>
-
-            <div
-                id="notesList"
-                class="notes-grid"
-            ></div>
+            <div class="page-header"><div><h2>Notas</h2><p>Registre observações, dúvidas e resumos.</p></div><button id="newNoteBtn" class="primary">+ Nova nota</button></div>
+            <div id="notesList" class="notes-grid"></div>
         </section>
 
         <section id="timer" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Timer de estudos</h2>
-                    <p>
-                        Meça o tempo real que você dedica ao estudo.
-                    </p>
-                </div>
-            </div>
-
+            <div class="page-header"><div><h2>Timer de estudos</h2><p>Meça o tempo real que você dedica ao estudo.</p></div></div>
             <div class="timer-layout">
                 <article class="card timer-card">
-                    <div class="timer-subject-row">
-                        <label for="timerSubjectSelect">
-                            Matéria
-                        </label>
-
-                        <select id="timerSubjectSelect">
-                            <option value="">
-                                Estudo geral
-                            </option>
-                        </select>
-                    </div>
-
-                    <div id="timerDisplay" class="timer-display">
-                        00:00:00
-                    </div>
-
-                    <div id="timerStatus" class="timer-status">
-                        Pronto para começar
-                    </div>
-
+                    <div class="timer-subject-row"><label for="timerSubjectSelect">Matéria</label><select id="timerSubjectSelect"><option value="">Estudo geral</option></select></div>
+                    <div id="timerDisplay" class="timer-display">00:00:00</div>
+                    <div id="timerStatus" class="timer-status">Pronto para começar</div>
                     <div class="timer-actions">
-                        <button
-                            id="timerStartBtn"
-                            class="primary timer-main-btn"
-                        >
-                            Iniciar
-                        </button>
-
-                        <button
-                            id="timerPauseBtn"
-                            class="secondary"
-                            disabled
-                        >
-                            Pausar
-                        </button>
-
-                        <button
-                            id="timerResetBtn"
-                            class="secondary"
-                        >
-                            Zerar
-                        </button>
-
-                        <button
-                            id="timerSaveBtn"
-                            class="success-btn"
-                            disabled
-                        >
-                            Salvar sessão
-                        </button>
+                        <button id="timerStartBtn" class="primary timer-main-btn">Iniciar</button>
+                        <button id="timerPauseBtn" class="secondary" disabled>Pausar</button>
+                        <button id="timerResetBtn" class="secondary">Zerar</button>
+                        <button id="timerSaveBtn" class="success-btn" disabled>Salvar sessão</button>
                     </div>
-
                 </article>
-
-                <article class="card">
-                    <div class="section-title-row">
-                        <div>
-                            <h3>Histórico recente</h3>
-                            <p>Últimas sessões registradas.</p>
-                        </div>
-                    </div>
-
-                    <div
-                        id="sessionList"
-                        class="session-list"
-                    ></div>
-                </article>
+                <article class="card"><div class="section-title-row"><div><h3>Histórico recente</h3><p>Últimas sessões registradas.</p></div></div><div id="sessionList" class="session-list"></div></article>
             </div>
         </section>
 
         <section id="progress" class="page">
-            <div class="page-header">
-                <div>
-                    <h2>Progresso</h2>
-                    <p>Seu avanço real por matéria.</p>
-                </div>
-            </div>
-
-            <div
-                id="progressList"
-                class="progress-list"
-            ></div>
+            <div class="page-header"><div><h2>Progresso</h2><p>Seu avanço real por matéria.</p></div></div>
+            <div id="progressList" class="progress-list"></div>
         </section>
 
         <section id="about" class="page">
             <div class="page-header about-page-header">
-                <div>
-                    <span class="about-eyebrow">Studify</span>
-                    <h2>Sobre</h2>
-                    <p>Organização, foco e constância em um só lugar.</p>
-                </div>
-
+                <div><span class="about-eyebrow">Studify</span><h2>Sobre</h2><p>Organização, foco e constância em um só lugar.</p></div>
                 <span class="version-pill">Versão 1.3.0</span>
             </div>
 
             <article class="about-hero card reveal">
-                <div class="about-logo-wrap" aria-hidden="true">
-                    <img src="studify-icon.png" alt="" class="about-logo">
-                </div>
-
-                <div class="about-hero-copy">
-                    <span class="about-kicker">Seu painel de estudos</span>
-                    <h3>Studify</h3>
-                    <p>
-                        Uma aplicação criada para centralizar matérias, conteúdos,
-                        revisões, notas, tempo de estudo e progresso em uma interface
-                        simples, organizada e agradável de usar.
-                    </p>
-                </div>
+                <div class="about-logo-wrap" aria-hidden="true"><img src="studify-icon.png" alt="" class="about-logo"></div>
+                <div class="about-hero-copy"><span class="about-kicker">Seu painel de estudos</span><h3>Studify</h3><p>Uma aplicação criada para centralizar matérias, conteúdos, revisões, notas, tempo de estudo e progresso em uma interface simples, organizada e agradável de usar.</p></div>
             </article>
 
             <div class="about-grid">
                 <article class="card about-card reveal delay-1">
                     <div class="about-card-icon" aria-hidden="true">◎</div>
-                    <div>
-                        <span class="about-card-label">Desenvolvedor</span>
-                        <h3>José Roberto Feitosa de Pádua</h3>
-                        <p>Desenvolvimento e identidade do projeto Studify.</p>
-
-                        <a
-                            class="instagram-link"
-                            href="https://www.instagram.com/robertof7b/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <span aria-hidden="true">↗</span>
-                            Instagram @robertof7b
-                        </a>
-                    </div>
+                    <div><span class="about-card-label">Desenvolvedor</span><h3>José Roberto Feitosa de Pádua</h3><p>Desenvolvimento e identidade do projeto Studify.</p><a class="instagram-link" href="https://www.instagram.com/robertof7b/" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span>Instagram @robertof7b</a></div>
                 </article>
-
                 <article class="card about-card reveal delay-2">
                     <div class="about-card-icon" aria-hidden="true">◇</div>
-                    <div>
-                        <span class="about-card-label">Propósito</span>
-                        <h3>Por que o Studify?</h3>
-                        <p>
-                            Para tornar a rotina de estudos mais clara: saber o que
-                            estudar, registrar o que foi feito e acompanhar a evolução
-                            sem espalhar tudo em ferramentas diferentes.
-                        </p>
-                    </div>
+                    <div><span class="about-card-label">Propósito</span><h3>Por que o Studify?</h3><p>Para tornar a rotina de estudos mais clara: saber o que estudar, registrar o que foi feito e acompanhar a evolução sem espalhar tudo em ferramentas diferentes.</p></div>
                 </article>
             </div>
 
             <article class="card about-section reveal delay-3">
-                <div class="section-title-row">
-                    <div>
-                        <span class="about-card-label">Recursos</span>
-                        <h3>O que faz parte do Studify</h3>
-                    </div>
-                </div>
-
+                <div class="section-title-row"><div><span class="about-card-label">Recursos</span><h3>O que faz parte do Studify</h3></div></div>
                 <div class="feature-grid">
                     <div class="feature-item"><span>✓</span><strong>Conteúdos</strong><small>Organize o que precisa estudar.</small></div>
                     <div class="feature-item"><span>↻</span><strong>Revisões</strong><small>Acompanhe assuntos para revisar.</small></div>
@@ -500,65 +258,26 @@
             </article>
 
             <article class="card tech-card reveal delay-4">
-                <div>
-                    <span class="about-card-label">Tecnologias</span>
-                    <h3>Construído com</h3>
-                    <p>Uma base leve para rodar localmente e continuar evoluindo.</p>
-                </div>
-
-                <div class="tech-list" aria-label="Tecnologias utilizadas">
-                    <span>HTML</span>
-                    <span>CSS</span>
-                    <span>JavaScript</span>
-                    <span>Java</span>
-                    <span>SQLite</span>
-                </div>
+                <div><span class="about-card-label">Tecnologias</span><h3>Construído com</h3><p>Uma base leve para rodar localmente e continuar evoluindo.</p></div>
+                <div class="tech-list" aria-label="Tecnologias utilizadas"><span>HTML</span><span>CSS</span><span>JavaScript</span><span>Java</span><span>SQLite</span></div>
             </article>
 
-            <div class="about-footer-note reveal delay-5">
-                <span>Studify</span>
-                <span class="about-footer-dot">•</span>
-                <span>Criado em 2026</span>
-            </div>
+            <div class="about-footer-note reveal delay-5"><span>Studify</span><span class="about-footer-dot">•</span><span>Criado em 2026</span></div>
         </section>
-
     </main>
 </div>
+
 <div id="modal" class="modal hidden">
     <div class="modal-box">
-        <div class="modal-header">
-            <h3 id="modalTitle"></h3>
-
-            <button
-                id="modalClose"
-                class="modal-close"
-            >
-                ×
-            </button>
-        </div>
-
+        <div class="modal-header"><h3 id="modalTitle"></h3><button id="modalClose" class="modal-close">×</button></div>
         <div id="modalBody"></div>
-
-        <div class="modal-actions">
-            <button
-                id="modalCancel"
-                class="secondary"
-            >
-                Cancelar
-            </button>
-
-            <button
-                id="modalConfirm"
-                class="primary"
-            >
-                Salvar
-            </button>
-        </div>
+        <div class="modal-actions"><button id="modalCancel" class="secondary">Cancelar</button><button id="modalConfirm" class="primary">Salvar</button></div>
     </div>
 </div>
 
 <div id="toast" class="toast"></div>
 
 <script src="app.js"></script>
+<script src="welcome.js"></script>
 </body>
 </html>
