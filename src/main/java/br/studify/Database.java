@@ -9,47 +9,63 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public class Database {
-    private static final Path DATABASE_PATH = resolveDatabasePath();
-    private static final String URL = "jdbc:sqlite:" + DATABASE_PATH.toAbsolutePath();
+    private final Path databasePath;
+    private final String url;
 
     public Database() {
-        initializeDatabaseFile();
+        this("studify.db", true);
+    }
+
+    public Database(String fileName, boolean seedFromTemplate) {
+        this.databasePath = resolveDatabasePath(fileName);
+        this.url = "jdbc:sqlite:" + databasePath.toAbsolutePath();
+        initializeDatabaseFile(seedFromTemplate);
         createTables();
         normalizeOrders();
     }
 
     public String databasePath() {
-        return DATABASE_PATH.toAbsolutePath().toString();
+        return databasePath.toAbsolutePath().toString();
     }
 
-    private static Path resolveDatabasePath() {
+    private static Path resolveDatabasePath(String fileName) {
         String explicitPath = System.getenv("DB_PATH");
         if (explicitPath != null && !explicitPath.isBlank()) {
-            return Path.of(explicitPath);
+            Path configured = Path.of(explicitPath);
+            if ("studify.db".equals(fileName)) {
+                return configured;
+            }
+
+            Path parent = configured.toAbsolutePath().getParent();
+            return parent == null ? Path.of(fileName) : parent.resolve(fileName);
         }
 
         String volumePath = System.getenv("RAILWAY_VOLUME_MOUNT_PATH");
         if (volumePath != null && !volumePath.isBlank()) {
-            return Path.of(volumePath, "studify.db");
+            return Path.of(volumePath, fileName);
         }
 
-        return Path.of("studify.db");
+        return Path.of(fileName);
     }
 
-    private static void initializeDatabaseFile() {
+    private void initializeDatabaseFile(boolean seedFromTemplate) {
         try {
-            Path parent = DATABASE_PATH.toAbsolutePath().getParent();
+            Path parent = databasePath.toAbsolutePath().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
 
-            if (Files.exists(DATABASE_PATH)) {
+            if (Files.exists(databasePath)) {
+                return;
+            }
+
+            if (!seedFromTemplate) {
                 return;
             }
 
             try (InputStream seed = Database.class.getResourceAsStream("/seed/studify.db")) {
                 if (seed != null) {
-                    Files.copy(seed, DATABASE_PATH, StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(seed, databasePath, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
         } catch (Exception e) {
@@ -58,7 +74,7 @@ public class Database {
     }
 
     private Connection connect() throws SQLException {
-        Connection c = DriverManager.getConnection(URL);
+        Connection c = DriverManager.getConnection(url);
         try (Statement s = c.createStatement()) {
             s.execute("PRAGMA foreign_keys = ON");
             s.execute("PRAGMA busy_timeout = 5000");
