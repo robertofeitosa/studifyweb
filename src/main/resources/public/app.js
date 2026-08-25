@@ -15,7 +15,7 @@ const state = {
     currentUser: null,
     isPrimary: false,
     roadmapProgress: {},
-    tutorConfigured: false,
+    documents: [],
     timer: {
         seconds: 0,
         interval: null,
@@ -45,13 +45,15 @@ const studyRoadmapList = document.getElementById("studyRoadmapList");
 const studyPathPercentage = document.getElementById("studyPathPercentage");
 const studyPathProgressLabel = document.getElementById("studyPathProgressLabel");
 const studyPathProgressBar = document.getElementById("studyPathProgressBar");
-const openTutorFromRoadmap = document.getElementById("openTutorFromRoadmap");
-const tutorMessages = document.getElementById("tutorMessages");
-const tutorForm = document.getElementById("tutorForm");
-const tutorInput = document.getElementById("tutorInput");
-const tutorSendBtn = document.getElementById("tutorSendBtn");
-const clearTutorHistory = document.getElementById("clearTutorHistory");
-const tutorConfigNotice = document.getElementById("tutorConfigNotice");
+const openDocumentsFromRoadmap = document.getElementById("openDocumentsFromRoadmap");
+const pdfFileInput = document.getElementById("pdfFileInput");
+const pdfDropZone = document.getElementById("pdfDropZone");
+const pdfList = document.getElementById("pdfList");
+const pdfLibraryCount = document.getElementById("pdfLibraryCount");
+const pdfViewer = document.getElementById("pdfViewer");
+const pdfViewerTitle = document.getElementById("pdfViewerTitle");
+const pdfViewerEmpty = document.getElementById("pdfViewerEmpty");
+const closePdfViewer = document.getElementById("closePdfViewer");
 
 const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modalTitle");
@@ -70,6 +72,12 @@ const timerStartBtn = document.getElementById("timerStartBtn");
 const timerPauseBtn = document.getElementById("timerPauseBtn");
 const timerResetBtn = document.getElementById("timerResetBtn");
 const timerSaveBtn = document.getElementById("timerSaveBtn");
+const floatingTimer = document.getElementById("floatingTimer");
+const floatingTimerDisplay = document.getElementById("floatingTimerDisplay");
+const floatingTimerSubject = document.getElementById("floatingTimerSubject");
+const floatingTimerToggle = document.getElementById("floatingTimerToggle");
+const floatingTimerOpen = document.getElementById("floatingTimerOpen");
+const pageTransitionBar = document.getElementById("pageTransitionBar");
 
 const toast = document.getElementById("toast");
 
@@ -154,57 +162,46 @@ async function api(url, options = {}) {
     return data;
 }
 
-function setActivePage(pageName) {
+async function setActivePage(pageName) {
+    const target = document.getElementById(pageName);
+    if (!target || target.classList.contains("hidden")) return;
+
+    const current = document.querySelector(".page.active");
+    if (current && current !== target) {
+        current.classList.add("page-leaving");
+        if (pageTransitionBar) pageTransitionBar.classList.add("moving");
+        await new Promise(resolve => setTimeout(resolve, 115));
+        current.classList.remove("active", "page-leaving");
+    }
+
     navButtons.forEach(button => {
-        button.classList.toggle(
-            "active",
-            button.dataset.page === pageName
-        );
+        button.classList.toggle("active", button.dataset.page === pageName);
     });
 
     pages.forEach(page => {
-        page.classList.toggle(
-            "active",
-            page.id === pageName
-        );
+        if (page !== target) page.classList.remove("active");
     });
 
-    
-    themeToggle.style.display =
-        pageName === "home" ? "block" : "none";
+    target.classList.add("active");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    themeToggle.style.display = pageName === "home" ? "block" : "none";
+
+    if (pageTransitionBar) {
+        setTimeout(() => pageTransitionBar.classList.remove("moving"), 260);
+    }
 }
 
-
 window.goToPage = async function(pageName) {
-    setActivePage(pageName);
+    await setActivePage(pageName);
 
-    if (pageName === "organize") {
-        await loadOrganizer();
-    }
-
-    if (pageName === "reviews") {
-        await loadReviews();
-    }
-
-    if (pageName === "notes") {
-        await loadNotes();
-    }
-
-    if (pageName === "timer") {
-        await loadSessions();
-    }
-
-    if (pageName === "progress") {
-        await loadProgress();
-    }
-
-    if (pageName === "studyPath") {
-        await loadStudyRoadmap();
-    }
-
-    if (pageName === "tutor") {
-        await loadTutorHistory();
-    }
+    if (pageName === "organize") await loadOrganizer();
+    if (pageName === "reviews") await loadReviews();
+    if (pageName === "notes") await loadNotes();
+    if (pageName === "timer") await loadSessions();
+    if (pageName === "progress") await loadProgress();
+    if (pageName === "studyPath") await loadStudyRoadmap();
+    if (pageName === "documents") await loadDocuments();
 };
 
 navButtons.forEach(button => {
@@ -381,12 +378,9 @@ function configureUserExperience() {
     });
 
     if (userWelcome) {
+        userWelcome.classList.toggle("primary-welcome", primary);
         if (primary) {
-            userWelcome.innerHTML = `
-                <span class="welcome-spark">✦</span>
-                <strong>Bem-Vindo José Roberto</strong>
-                <span class="welcome-spark">✦</span>
-            `;
+            userWelcome.innerHTML = `<strong>Bem-Vindo José Roberto</strong>`;
         } else if (username === "julia") {
             userWelcome.innerHTML = `
                 <span class="welcome-spark">✦</span>
@@ -415,18 +409,54 @@ function configureUserExperience() {
                 </article>
             `;
         } else if (primary) {
+            const hour = new Date().getHours();
+            const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+            const dateLabel = new Intl.DateTimeFormat("pt-BR", {
+                weekday: "long", day: "2-digit", month: "long"
+            }).format(new Date());
+
+            userWelcome.classList.add("primary-welcome");
+            userWelcome.innerHTML = `
+                <div class="welcome-orb welcome-orb-one"></div>
+                <div class="welcome-orb welcome-orb-two"></div>
+                <div class="welcome-avatar">JR</div>
+                <div class="welcome-copy">
+                    <span class="welcome-overline">${escapeHtml(dateLabel)}</span>
+                    <h2>${greeting}, José Roberto.</h2>
+                    <p>Seu espaço para transformar LP, AED e prática em progresso real.</p>
+                    <div class="welcome-tags">
+                        <span>Java / LP</span><span>AED</span><span>Entendendo Algoritmos</span>
+                    </div>
+                </div>
+                <button class="welcome-cta" type="button" onclick="goToPage('studyPath')">Continuar trilha →</button>
+            `;
+
             homeUserExtras.innerHTML = `
-                <article class="card user-extra-card roberto-study-card reveal">
-                    <div>
-                        <span class="roadmap-kicker">NOVA ÁREA DE ESTUDO</span>
-                        <h3>LP + AED + Entendendo Algoritmos</h3>
-                        <p>Siga a trilha integrada e converse com o Tutor IA quando surgir uma dúvida.</p>
-                    </div>
-                    <div class="user-extra-actions">
-                        <button class="primary" type="button" onclick="goToPage('studyPath')">Abrir trilha</button>
-                        <button class="secondary" type="button" onclick="goToPage('tutor')">Tutor IA</button>
-                    </div>
-                </article>
+                <div class="roberto-dashboard reveal">
+                    <article class="dashboard-focus-card interactive-card" onclick="goToPage('studyPath')">
+                        <div class="dashboard-card-icon">⌁</div>
+                        <div>
+                            <span class="dashboard-card-label">Trilha integrada</span>
+                            <h3 id="dashboardCurrentStage">Carregando sua etapa...</h3>
+                            <p id="dashboardRoadmapText">LP + AED + Entendendo Algoritmos</p>
+                        </div>
+                        <div class="dashboard-ring" id="dashboardRoadmapRing"><strong id="dashboardRoadmapPercent">0%</strong></div>
+                    </article>
+
+                    <article class="dashboard-mini-card interactive-card" onclick="goToPage('timer')">
+                        <span class="dashboard-card-label">Sessão atual</span>
+                        <strong id="dashboardTimerDisplay">00:00:00</strong>
+                        <p id="dashboardTimerStatus">Pronto para estudar</p>
+                        <span class="dashboard-link">Abrir timer →</span>
+                    </article>
+
+                    <article class="dashboard-mini-card interactive-card" onclick="goToPage('documents')">
+                        <span class="dashboard-card-label">Biblioteca</span>
+                        <strong id="dashboardPdfCount">0 PDF</strong>
+                        <p>Materiais de aula, listas e apostilas no mesmo lugar.</p>
+                        <span class="dashboard-link">Abrir biblioteca →</span>
+                    </article>
+                </div>
             `;
         } else {
             homeUserExtras.innerHTML = "";
@@ -451,6 +481,8 @@ function renderStudyRoadmap() {
     studyPathPercentage.textContent = `${percentage}%`;
     studyPathProgressLabel.textContent = `${completed} de ${allSteps.length} passos concluídos`;
     studyPathProgressBar.style.width = `${percentage}%`;
+
+    refreshRobertoDashboard();
 
     studyRoadmapList.innerHTML = integratedStudyRoadmap.map((stage, index) => {
         const stageDone = stage.steps.filter(([key]) => state.roadmapProgress[key]).length;
@@ -483,13 +515,6 @@ function renderStudyRoadmap() {
                         `).join("")}
                     </div>
 
-                    <button
-                        class="stage-tutor-button"
-                        type="button"
-                        data-stage-tutor="${index}"
-                    >
-                        ✦ Conversar com o Tutor sobre esta etapa
-                    </button>
                 </div>
             </article>
         `;
@@ -517,133 +542,171 @@ if (studyRoadmapList) {
         }
     });
 
-    studyRoadmapList.addEventListener("click", async event => {
-        const button = event.target.closest("[data-stage-tutor]");
-        if (!button) return;
-
-        const stage = integratedStudyRoadmap[Number(button.dataset.stageTutor)];
-        if (!stage) return;
-
-        await window.goToPage("tutor");
-        tutorInput.value = `Estou na etapa "${stage.title}". Me explique como conectar LP/Java (${stage.java}) com AED (${stage.aed}) e com ${stage.book}, e me diga o próximo passo prático.`;
-        tutorInput.focus();
-    });
 }
 
-if (openTutorFromRoadmap) {
-    openTutorFromRoadmap.addEventListener("click", () => window.goToPage("tutor"));
+if (openDocumentsFromRoadmap) {
+    openDocumentsFromRoadmap.addEventListener("click", () => window.goToPage("documents"));
 }
 
-function renderTutorMessages(messages) {
-    if (!tutorMessages) return;
+function refreshRobertoDashboard() {
+    if (!isPrimaryProfile()) return;
 
-    if (!messages.length) {
-        tutorMessages.innerHTML = `
-            <div class="tutor-empty">
-                <span>✦</span>
-                <strong>Seu tutor está pronto.</strong>
-                <p>Pergunte sobre Java, AED ou uma etapa da trilha.</p>
-            </div>
-        `;
+    const allSteps = integratedStudyRoadmap.flatMap(stage => stage.steps);
+    const completed = allSteps.filter(([key]) => state.roadmapProgress[key]).length;
+    const percentage = allSteps.length ? Math.round((completed / allSteps.length) * 100) : 0;
+    const currentStage = integratedStudyRoadmap.find(stage =>
+        stage.steps.some(([key]) => !state.roadmapProgress[key])
+    );
+
+    const percentEl = document.getElementById("dashboardRoadmapPercent");
+    const ringEl = document.getElementById("dashboardRoadmapRing");
+    const stageEl = document.getElementById("dashboardCurrentStage");
+    const textEl = document.getElementById("dashboardRoadmapText");
+    const pdfEl = document.getElementById("dashboardPdfCount");
+
+    if (percentEl) percentEl.textContent = `${percentage}%`;
+    if (ringEl) ringEl.style.setProperty("--progress", `${percentage * 3.6}deg`);
+    if (stageEl) stageEl.textContent = currentStage ? currentStage.title : "Trilha concluída";
+    if (textEl) textEl.textContent = currentStage
+        ? `${currentStage.java} · ${currentStage.aed}`
+        : "Todas as etapas foram concluídas.";
+    if (pdfEl) pdfEl.textContent = `${state.documents.length} PDF${state.documents.length === 1 ? "" : "s"}`;
+}
+
+async function loadDocuments() {
+    if (!isPrimaryProfile()) return;
+    const data = await api("/api/documents");
+    state.documents = Array.isArray(data) ? data : [];
+    renderDocuments();
+    refreshRobertoDashboard();
+}
+
+function renderDocuments() {
+    if (!pdfList) return;
+
+    if (pdfLibraryCount) {
+        pdfLibraryCount.textContent = state.documents.length
+            ? `${state.documents.length} arquivo${state.documents.length === 1 ? "" : "s"} salvo${state.documents.length === 1 ? "" : "s"}.`
+            : "Nenhum arquivo adicionado.";
+    }
+
+    if (!state.documents.length) {
+        pdfList.innerHTML = `<div class="empty pdf-empty">Sua biblioteca ainda está vazia.</div>`;
         return;
     }
 
-    tutorMessages.innerHTML = "";
-
-    messages.forEach(message => {
-        const wrapper = document.createElement("div");
-        wrapper.className = `tutor-message ${message.role === "user" ? "user" : "assistant"}`;
-
-        const label = document.createElement("small");
-        label.textContent = message.role === "user" ? "Você" : "Tutor IA";
-
-        const content = document.createElement("div");
-        content.className = "tutor-message-content";
-        content.textContent = message.content;
-
-        wrapper.append(label, content);
-        tutorMessages.appendChild(wrapper);
-    });
-
-    tutorMessages.scrollTop = tutorMessages.scrollHeight;
+    pdfList.innerHTML = state.documents.map(doc => `
+        <article class="pdf-item" data-pdf-id="${doc.id}">
+            <div class="pdf-item-icon">PDF</div>
+            <div class="pdf-item-copy">
+                <strong title="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</strong>
+                <span>${formatBytes(doc.sizeBytes)} · ${formatDateTime(doc.uploadedAt)}</span>
+            </div>
+            <div class="pdf-item-actions">
+                <button class="secondary" type="button" data-pdf-open="${doc.id}">Abrir</button>
+                <button class="danger" type="button" data-pdf-delete="${doc.id}">Excluir</button>
+            </div>
+        </article>
+    `).join("");
 }
 
-async function loadTutorHistory() {
-    if (!isPrimaryProfile() || !tutorMessages) return;
-
-    const data = await api("/api/tutor/history");
-    state.tutorConfigured = Boolean(data.configured);
-    renderTutorMessages(data.messages || []);
-
-    if (tutorConfigNotice) {
-        if (state.tutorConfigured) {
-            tutorConfigNotice.classList.add("hidden");
-            tutorConfigNotice.textContent = "";
-        } else {
-            tutorConfigNotice.classList.remove("hidden");
-            tutorConfigNotice.innerHTML = `
-                <strong>Falta configurar a OpenAI API.</strong>
-                <span>Adicione a variável <code>OPENAI_API_KEY</code> no ambiente do Studify. O passo a passo está no arquivo GUIA_PASSO_A_PASSO.md.</span>
-            `;
-        }
+async function uploadPdf(file) {
+    if (!file) return;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+        showToast("Selecione um arquivo PDF.");
+        return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+        showToast("O PDF deve ter no máximo 15 MB.");
+        return;
     }
 
-    if (tutorSendBtn) tutorSendBtn.disabled = !state.tutorConfigured;
-}
-
-async function sendTutorMessage(message) {
-    if (!message.trim() || !state.tutorConfigured) return;
-
-    const historyData = await api("/api/tutor/history");
-    const optimistic = [
-        ...(historyData.messages || []),
-        { role: "user", content: message },
-        { role: "assistant", content: "Pensando…" }
-    ];
-    renderTutorMessages(optimistic);
-
-    tutorSendBtn.disabled = true;
-    tutorInput.disabled = true;
-
+    pdfDropZone?.classList.add("uploading");
     try {
-        await api("/api/tutor/chat", {
+        const response = await fetch(`${API_BASE}/api/documents?name=${encodeURIComponent(file.name)}`, {
             method: "POST",
-            body: JSON.stringify({ message })
+            credentials: "include",
+            headers: { "Content-Type": "application/pdf" },
+            body: file
         });
-        tutorInput.value = "";
-        await loadTutorHistory();
+        const data = await response.json();
+        if (response.status === 401) {
+            window.location.href = `${API_BASE}/login.html`;
+            return;
+        }
+        if (!response.ok) throw new Error(data.error || "Não foi possível salvar o PDF.");
+        await loadDocuments();
+        showToast("PDF adicionado à biblioteca.");
+        if (data.id) openPdf(Number(data.id));
     } catch (error) {
-        showToast(error.message || "Não foi possível falar com o Tutor IA.");
-        await loadTutorHistory();
+        showToast(error.message || "Erro ao enviar PDF.");
     } finally {
-        tutorInput.disabled = false;
-        tutorSendBtn.disabled = !state.tutorConfigured;
-        tutorInput.focus();
+        pdfDropZone?.classList.remove("uploading");
+        if (pdfFileInput) pdfFileInput.value = "";
     }
 }
 
-if (tutorForm) {
-    tutorForm.addEventListener("submit", async event => {
-        event.preventDefault();
-        await sendTutorMessage(tutorInput.value);
-    });
+function openPdf(id) {
+    const doc = state.documents.find(item => Number(item.id) === Number(id));
+    if (!doc || !pdfViewer) return;
+    pdfViewer.src = `${API_BASE}/api/documents/file?id=${encodeURIComponent(id)}`;
+    pdfViewer.classList.remove("hidden");
+    pdfViewerEmpty?.classList.add("hidden");
+    closePdfViewer?.classList.remove("hidden");
+    if (pdfViewerTitle) pdfViewerTitle.textContent = doc.name;
 }
 
-document.querySelectorAll("[data-tutor-prompt]").forEach(button => {
-    button.addEventListener("click", () => {
-        if (!tutorInput) return;
-        tutorInput.value = button.dataset.tutorPrompt;
-        tutorInput.focus();
-    });
-});
+function closePdf() {
+    if (pdfViewer) {
+        pdfViewer.src = "about:blank";
+        pdfViewer.classList.add("hidden");
+    }
+    pdfViewerEmpty?.classList.remove("hidden");
+    closePdfViewer?.classList.add("hidden");
+    if (pdfViewerTitle) pdfViewerTitle.textContent = "Selecione um PDF";
+}
 
-if (clearTutorHistory) {
-    clearTutorHistory.addEventListener("click", async () => {
-        if (!confirm("Limpar todo o histórico do Tutor IA?")) return;
-        await api("/api/tutor/history", { method: "DELETE" });
-        await loadTutorHistory();
-        showToast("Conversa apagada.");
+async function deletePdf(id) {
+    if (!confirm("Excluir este PDF da biblioteca?")) return;
+    await api(`/api/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (pdfViewer && pdfViewer.src.includes(`id=${id}`)) closePdf();
+    await loadDocuments();
+    showToast("PDF excluído.");
+}
+
+if (pdfFileInput) pdfFileInput.addEventListener("change", () => uploadPdf(pdfFileInput.files?.[0]));
+if (pdfDropZone) {
+    pdfDropZone.addEventListener("click", () => pdfFileInput?.click());
+    pdfDropZone.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            pdfFileInput?.click();
+        }
     });
+    ["dragenter", "dragover"].forEach(type => pdfDropZone.addEventListener(type, event => {
+        event.preventDefault();
+        pdfDropZone.classList.add("dragging");
+    }));
+    ["dragleave", "drop"].forEach(type => pdfDropZone.addEventListener(type, event => {
+        event.preventDefault();
+        pdfDropZone.classList.remove("dragging");
+    }));
+    pdfDropZone.addEventListener("drop", event => uploadPdf(event.dataTransfer?.files?.[0]));
+}
+if (pdfList) pdfList.addEventListener("click", event => {
+    const openBtn = event.target.closest("[data-pdf-open]");
+    const deleteBtn = event.target.closest("[data-pdf-delete]");
+    if (openBtn) openPdf(Number(openBtn.dataset.pdfOpen));
+    if (deleteBtn) deletePdf(Number(deleteBtn.dataset.pdfDelete));
+});
+if (closePdfViewer) closePdfViewer.addEventListener("click", closePdf);
+
+function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function applyTheme(theme) {
@@ -1954,156 +2017,162 @@ window.deleteNote = async function(id) {
     showToast("Nota excluída.");
 };
 
+function timerStorageKey() {
+    const user = String(state.currentUser || "default").toLowerCase();
+    return `studify-timer-${user}`;
+}
+
+function currentTimerSubjectLabel() {
+    const selected = timerSubjectSelect?.selectedOptions?.[0]?.textContent?.trim();
+    return selected || "Estudo geral";
+}
+
 function renderTimer() {
-    timerDisplay.textContent =
-        formatDuration(state.timer.seconds);
+    const formatted = formatDuration(state.timer.seconds);
 
-    timerSaveBtn.disabled =
-        state.timer.seconds <= 0 ||
-        state.timer.running;
+    if (timerDisplay) timerDisplay.textContent = formatted;
+    if (floatingTimerDisplay) floatingTimerDisplay.textContent = formatted;
 
-    timerPauseBtn.disabled =
-        !state.timer.running;
+    const dashboardTimer = document.getElementById("dashboardTimerDisplay");
+    const dashboardStatus = document.getElementById("dashboardTimerStatus");
+    if (dashboardTimer) dashboardTimer.textContent = formatted;
 
-    timerStartBtn.disabled =
-        state.timer.running;
+    if (timerSaveBtn) timerSaveBtn.disabled = state.timer.seconds <= 0 || state.timer.running;
+    if (timerPauseBtn) timerPauseBtn.disabled = !state.timer.running;
+    if (timerStartBtn) timerStartBtn.disabled = state.timer.running;
 
-    const timerCard =
-        document.querySelector(".timer-card");
+    const timerCard = document.querySelector(".timer-card");
+    timerCard?.classList.toggle("running", state.timer.running);
+    floatingTimer?.classList.toggle("running", state.timer.running);
 
-    timerCard.classList.toggle(
-        "running",
-        state.timer.running
-    );
+    const subjectLabel = currentTimerSubjectLabel();
+    if (floatingTimerSubject) floatingTimerSubject.textContent = state.timer.running
+        ? `Estudando · ${subjectLabel}`
+        : state.timer.seconds > 0
+        ? `Pausado · ${subjectLabel}`
+        : "Timer de estudos";
+
+    if (floatingTimerToggle) {
+        floatingTimerToggle.textContent = state.timer.running ? "Ⅱ" : "▶";
+        floatingTimerToggle.title = state.timer.running ? "Pausar timer" : "Iniciar timer";
+    }
 
     if (state.timer.running) {
-        timerStatus.textContent =
-            "Estudando agora...";
+        if (timerStatus) timerStatus.textContent = "Estudando agora...";
+        if (dashboardStatus) dashboardStatus.textContent = `Em andamento · ${subjectLabel}`;
     } else if (state.timer.seconds > 0) {
-        timerStatus.textContent =
-            "Sessão pausada";
+        if (timerStatus) timerStatus.textContent = "Sessão pausada";
+        if (dashboardStatus) dashboardStatus.textContent = `Pausado · ${subjectLabel}`;
     } else {
-        timerStatus.textContent =
-            "Pronto para começar";
+        if (timerStatus) timerStatus.textContent = "Pronto para começar";
+        if (dashboardStatus) dashboardStatus.textContent = "Pronto para estudar";
     }
 }
 
-timerStartBtn.addEventListener(
-    "click",
-    () => {
-        if (state.timer.running) return;
+function startTimer() {
+    if (state.timer.running) return;
+    state.timer.running = true;
+    state.timer.startedAt = Date.now();
 
-        state.timer.running = true;
-
-        state.timer.interval =
-            setInterval(() => {
-                state.timer.seconds++;
-                renderTimer();
-                persistTimerLocally();
-            }, 1000);
-
+    if (state.timer.interval) clearInterval(state.timer.interval);
+    state.timer.interval = setInterval(() => {
+        state.timer.seconds++;
         renderTimer();
-    }
-);
-
-timerPauseBtn.addEventListener(
-    "click",
-    () => {
-        pauseTimer();
-    }
-);
-
-function pauseTimer() {
-    if (state.timer.interval) {
-        clearInterval(
-            state.timer.interval
-        );
-    }
-
-    state.timer.interval = null;
-    state.timer.running = false;
+        persistTimerLocally();
+    }, 1000);
 
     renderTimer();
     persistTimerLocally();
 }
 
-timerResetBtn.addEventListener(
-    "click",
-    () => {
-        if (
-            state.timer.seconds > 0 &&
-            !confirm(
-                "Zerar o timer atual?"
-            )
-        ) {
-            return;
-        }
+function pauseTimer() {
+    if (state.timer.interval) clearInterval(state.timer.interval);
+    state.timer.interval = null;
+    state.timer.running = false;
+    state.timer.startedAt = null;
+    renderTimer();
+    persistTimerLocally();
+}
 
-        pauseTimer();
+function resetTimer() {
+    if (state.timer.seconds > 0 && !confirm("Zerar o timer atual?")) return;
+    pauseTimer();
+    state.timer.seconds = 0;
+    persistTimerLocally();
+    renderTimer();
+}
 
-        state.timer.seconds = 0;
-        persistTimerLocally();
+async function saveTimerSession() {
+    if (state.timer.seconds <= 0 || state.timer.running) return;
+
+    const subjectValue = timerSubjectSelect?.value || "";
+    await api("/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({
+            subjectId: subjectValue ? Number(subjectValue) : null,
+            durationSeconds: state.timer.seconds
+        })
+    });
+
+    state.timer.seconds = 0;
+    persistTimerLocally();
+    renderTimer();
+    await loadSessions();
+    await loadStudySummary();
+    showToast("Sessão de estudo salva.");
+}
+
+if (timerStartBtn) timerStartBtn.addEventListener("click", startTimer);
+if (timerPauseBtn) timerPauseBtn.addEventListener("click", pauseTimer);
+if (timerResetBtn) timerResetBtn.addEventListener("click", resetTimer);
+if (timerSaveBtn) timerSaveBtn.addEventListener("click", saveTimerSession);
+
+if (floatingTimerToggle) {
+    floatingTimerToggle.addEventListener("click", event => {
+        event.stopPropagation();
+        state.timer.running ? pauseTimer() : startTimer();
+    });
+}
+
+if (floatingTimerOpen) {
+    floatingTimerOpen.addEventListener("click", () => window.goToPage("timer"));
+}
+
+if (timerSubjectSelect) {
+    timerSubjectSelect.addEventListener("change", () => {
         renderTimer();
-    }
-);
-
-timerSaveBtn.addEventListener(
-    "click",
-    async () => {
-        if (
-            state.timer.seconds <= 0 ||
-            state.timer.running
-        ) {
-            return;
-        }
-
-        const subjectValue =
-            timerSubjectSelect.value;
-
-        await api("/api/sessions", {
-            method: "POST",
-            body: JSON.stringify({
-                subjectId:
-                    subjectValue
-                    ? Number(subjectValue)
-                    : null,
-
-                durationSeconds:
-                    state.timer.seconds
-            })
-        });
-
-        state.timer.seconds = 0;
         persistTimerLocally();
-        renderTimer();
-
-        await loadSessions();
-        await loadStudySummary();
-
-        showToast("Sessão de estudo salva.");
-    }
-);
+    });
+}
 
 function persistTimerLocally() {
-    localStorage.setItem(
-        "studify-timer-seconds",
-        String(state.timer.seconds)
-    );
+    const payload = {
+        seconds: state.timer.seconds,
+        running: state.timer.running,
+        savedAt: Date.now(),
+        subjectId: timerSubjectSelect?.value || ""
+    };
+    localStorage.setItem(timerStorageKey(), JSON.stringify(payload));
 }
 
 function restoreTimerLocally() {
-    const saved =
-        Number(
-            localStorage.getItem(
-                "studify-timer-seconds"
-            ) || 0
-        );
+    let payload = null;
+    try {
+        payload = JSON.parse(localStorage.getItem(timerStorageKey()) || "null");
+    } catch (_) {
+        payload = null;
+    }
 
-    if (
-        Number.isFinite(saved) &&
-        saved > 0
-    ) {
-        state.timer.seconds = saved;
+    if (payload && Number.isFinite(Number(payload.seconds))) {
+        state.timer.seconds = Math.max(0, Number(payload.seconds));
+        if (payload.running && payload.savedAt) {
+            state.timer.seconds += Math.max(0, Math.floor((Date.now() - Number(payload.savedAt)) / 1000));
+            state.timer.running = false;
+            setTimeout(startTimer, 0);
+        }
+        if (timerSubjectSelect && payload.subjectId !== undefined) {
+            timerSubjectSelect.value = String(payload.subjectId || "");
+        }
     }
 
     renderTimer();
@@ -2324,14 +2393,56 @@ document.addEventListener(
     }
 );
 
+
+function initDynamicEffects() {
+    document.addEventListener("pointerdown", event => {
+        const target = event.target.closest("button, .quick-action, .interactive-card, .upload-pdf-button");
+        if (!target || target.disabled) return;
+
+        const rect = target.getBoundingClientRect();
+        const ripple = document.createElement("span");
+        ripple.className = "js-ripple";
+        const size = Math.max(rect.width, rect.height) * .45;
+        ripple.style.width = `${size}px`;
+        ripple.style.height = `${size}px`;
+        ripple.style.left = `${event.clientX - rect.left}px`;
+        ripple.style.top = `${event.clientY - rect.top}px`;
+        target.appendChild(ripple);
+        ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+    });
+
+    document.addEventListener("pointermove", event => {
+        const hero = document.querySelector(".welcome-banner.primary-welcome");
+        if (!hero) return;
+        const rect = hero.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+            return;
+        }
+        const x = ((event.clientX - rect.left) / rect.width - .5) * 12;
+        const y = ((event.clientY - rect.top) / rect.height - .5) * 12;
+        hero.style.setProperty("--hero-x", `${x}px`);
+        hero.style.setProperty("--hero-y", `${y}px`);
+    });
+
+    document.addEventListener("pointerleave", () => {
+        const hero = document.querySelector(".welcome-banner.primary-welcome");
+        hero?.style.setProperty("--hero-x", "0px");
+        hero?.style.setProperty("--hero-y", "0px");
+    });
+}
+
 async function initApp() {
     initTheme();
-    restoreTimerLocally();
+    initDynamicEffects();
 
     try {
         await loadCurrentUser();
         await loadSubjects();
+        restoreTimerLocally();
         await loadStudySummary();
+        if (isPrimaryProfile()) {
+            await Promise.all([loadStudyRoadmap(), loadDocuments()]);
+        }
     } catch (error) {
         console.error(error);
         showToast(error.message || "Não foi possível conectar ao backend.");

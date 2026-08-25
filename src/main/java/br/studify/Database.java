@@ -144,11 +144,12 @@ public class Database {
             """);
 
             s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS chat_messages (
+                CREATE TABLE IF NOT EXISTS documents (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    name TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    uploaded_at TEXT NOT NULL,
+                    data BLOB NOT NULL
                 )
             """);
         } catch (SQLException e) {
@@ -787,62 +788,93 @@ public class Database {
         }
     }
 
-    public List<ChatMessage> chatHistory(int limit) {
-        int safeLimit = Math.max(1, Math.min(limit, 100));
-        List<ChatMessage> reversed = new ArrayList<>();
+    public List<DocumentMeta> documents() {
+        List<DocumentMeta> items = new ArrayList<>();
 
         try (Connection c = connect();
              PreparedStatement p = c.prepareStatement("""
-                 SELECT id, role, content, created_at
-                 FROM chat_messages
+                 SELECT id, name, size_bytes, uploaded_at
+                 FROM documents
                  ORDER BY id DESC
-                 LIMIT ?
-             """)) {
-            p.setInt(1, safeLimit);
+             """);
+             ResultSet r = p.executeQuery()) {
 
-            try (ResultSet r = p.executeQuery()) {
-                while (r.next()) {
-                    reversed.add(new ChatMessage(
-                        r.getInt("id"),
-                        r.getString("role"),
-                        r.getString("content"),
-                        r.getString("created_at")
-                    ));
-                }
+            while (r.next()) {
+                items.add(new DocumentMeta(
+                    r.getInt("id"),
+                    r.getString("name"),
+                    r.getLong("size_bytes"),
+                    r.getString("uploaded_at")
+                ));
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
 
-        Collections.reverse(reversed);
-        return reversed;
+        return items;
     }
 
-    public void addChatMessage(String role, String content) {
-        if (!("user".equals(role) || "assistant".equals(role))) {
-            throw new RuntimeException("Papel de mensagem inválido.");
+    public int addDocument(String name, byte[] data) {
+        String safeName = name == null ? "material.pdf" : name.trim();
+        if (safeName.isBlank()) safeName = "material.pdf";
+        if (!safeName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            safeName += ".pdf";
         }
-
-        String text = content == null ? "" : content.trim();
-        if (text.isBlank()) return;
+        if (safeName.length() > 180) {
+            safeName = safeName.substring(0, 176) + ".pdf";
+        }
+        if (data == null || data.length == 0) {
+            throw new RuntimeException("O PDF está vazio.");
+        }
 
         try (Connection c = connect();
              PreparedStatement p = c.prepareStatement("""
-                 INSERT INTO chat_messages(role, content, created_at)
-                 VALUES(?, ?, ?)
+                 INSERT INTO documents(name, size_bytes, uploaded_at, data)
+                 VALUES(?, ?, ?, ?)
              """)) {
-            p.setString(1, role);
-            p.setString(2, text);
+            p.setString(1, safeName);
+            p.setLong(2, data.length);
             p.setString(3, LocalDateTime.now().toString());
+            p.setBytes(4, data);
             p.executeUpdate();
+
+            try (Statement s = c.createStatement();
+                 ResultSet r = s.executeQuery("SELECT last_insert_rowid()")) {
+                return r.next() ? r.getInt(1) : -1;
+            }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void clearChatHistory() {
+    public StoredDocument document(int id) {
         try (Connection c = connect();
-             PreparedStatement p = c.prepareStatement("DELETE FROM chat_messages")) {
+             PreparedStatement p = c.prepareStatement("""
+                 SELECT id, name, size_bytes, uploaded_at, data
+                 FROM documents
+                 WHERE id=?
+             """)) {
+            p.setInt(1, id);
+
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) return null;
+                return new StoredDocument(
+                    r.getInt("id"),
+                    r.getString("name"),
+                    r.getLong("size_bytes"),
+                    r.getString("uploaded_at"),
+                    r.getBytes("data")
+                );
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void deleteDocument(int id) {
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement("DELETE FROM documents WHERE id=?")) {
+            p.setInt(1, id);
             p.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -858,5 +890,6 @@ public class Database {
     public record Note(int id, String title, String body, String subject, String createdAt, String updatedAt) {}
     public record StudySession(int id, String subject, int durationSeconds, String studiedAt) {}
     public record StudySummary(int subjects, int contents, int totalSeconds, int sessions) {}
-    public record ChatMessage(int id, String role, String content, String createdAt) {}
+    public record DocumentMeta(int id, String name, long sizeBytes, String uploadedAt) {}
+    public record StoredDocument(int id, String name, long sizeBytes, String uploadedAt, byte[] data) {}
 }

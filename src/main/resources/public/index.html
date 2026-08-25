@@ -72,9 +72,9 @@
                 Trilha LP + AED
             </button>
 
-            <button class="nav primary-only" data-page="tutor">
-                <span>✦</span>
-                Tutor IA
+            <button class="nav primary-only" data-page="documents">
+                <span>▤</span>
+                Biblioteca PDF
             </button>
 
             <button class="nav" data-page="about">
@@ -446,8 +446,8 @@
                     <p>Aprenda Java em LP e use cada ferramenta para implementar os conceitos de AED.</p>
                 </div>
 
-                <button id="openTutorFromRoadmap" class="primary" type="button">
-                    ✦ Perguntar ao Tutor
+                <button id="openDocumentsFromRoadmap" class="primary" type="button">
+                    ▤ Abrir Biblioteca PDF
                 </button>
             </div>
 
@@ -470,46 +470,55 @@
             <div id="studyRoadmapList" class="study-roadmap-list"></div>
         </section>
 
-        <section id="tutor" class="page primary-only">
+        <section id="documents" class="page primary-only">
             <div class="page-header">
                 <div>
-                    <span class="roadmap-kicker">STUDIFY IA</span>
-                    <h2>Tutor de LP + AED</h2>
-                    <p>Converse sobre Java, algoritmos, estruturas de dados e o livro Entendendo Algoritmos.</p>
+                    <span class="roadmap-kicker">BIBLIOTECA PESSOAL</span>
+                    <h2>Materiais em PDF</h2>
+                    <p>Adicione apostilas, listas, resumos e outros PDFs para consultar sem sair do Studify.</p>
                 </div>
 
-                <button id="clearTutorHistory" class="secondary" type="button">
-                    Limpar conversa
-                </button>
+                <label class="primary upload-pdf-button" for="pdfFileInput">
+                    + Adicionar PDF
+                </label>
+                <input id="pdfFileInput" type="file" accept="application/pdf,.pdf" hidden>
             </div>
 
-            <article class="card tutor-card">
-                <div id="tutorConfigNotice" class="tutor-config hidden"></div>
+            <div class="pdf-layout">
+                <article class="card pdf-library-card">
+                    <div id="pdfDropZone" class="pdf-drop-zone" tabindex="0" role="button" aria-label="Adicionar arquivo PDF">
+                        <div class="pdf-drop-icon">PDF</div>
+                        <div>
+                            <strong>Arraste um PDF para cá</strong>
+                            <span>ou clique para escolher um arquivo · máximo 15 MB</span>
+                        </div>
+                    </div>
 
-                <div class="tutor-suggestions" aria-label="Perguntas rápidas">
-                    <button type="button" data-tutor-prompt="Explique o ponto atual da minha trilha e o que devo estudar agora.">Onde estou?</button>
-                    <button type="button" data-tutor-prompt="Conecte o que estou aprendendo em Java com AED e com o capítulo correspondente de Entendendo Algoritmos.">Conectar conteúdos</button>
-                    <button type="button" data-tutor-prompt="Me passe um exercício curto do meu nível atual, sem mostrar a solução.">Exercício</button>
-                    <button type="button" data-tutor-prompt="Explique Big O de forma simples usando um exemplo em Java.">Big O</button>
-                </div>
+                    <div class="section-title-row pdf-list-heading">
+                        <div>
+                            <h3>Sua biblioteca</h3>
+                            <p id="pdfLibraryCount">Nenhum arquivo adicionado.</p>
+                        </div>
+                    </div>
+                    <div id="pdfList" class="pdf-list"></div>
+                </article>
 
-                <div id="tutorMessages" class="tutor-messages" aria-live="polite"></div>
-
-                <form id="tutorForm" class="tutor-form">
-                    <textarea
-                        id="tutorInput"
-                        rows="3"
-                        maxlength="6000"
-                        placeholder="Ex.: Como busca binária se conecta com arrays em Java?"
-                        required
-                    ></textarea>
-                    <button id="tutorSendBtn" class="primary" type="submit">Enviar</button>
-                </form>
-
-                <p class="tutor-footnote">
-                    A chave da API fica somente no backend. O histórico desta aba é salvo no banco do perfil Roberto.
-                </p>
-            </article>
+                <article class="card pdf-viewer-card">
+                    <div class="pdf-viewer-head">
+                        <div>
+                            <span class="roadmap-kicker">LEITOR INTEGRADO</span>
+                            <h3 id="pdfViewerTitle">Selecione um PDF</h3>
+                        </div>
+                        <button id="closePdfViewer" class="secondary hidden" type="button">Fechar</button>
+                    </div>
+                    <div id="pdfViewerEmpty" class="pdf-viewer-empty">
+                        <span>▤</span>
+                        <strong>Leia seus materiais dentro do Studify</strong>
+                        <p>Escolha um arquivo da biblioteca para abrir o leitor.</p>
+                    </div>
+                    <iframe id="pdfViewer" class="pdf-viewer hidden" title="Leitor de PDF"></iframe>
+                </article>
+            </div>
         </section>
 
         <section id="about" class="page">
@@ -520,7 +529,7 @@
                     <p>Organização, foco e constância em um só lugar.</p>
                 </div>
 
-                <span class="version-pill">Versão 1.3.0</span>
+                <span class="version-pill">Versão 1.5.0</span>
             </div>
 
             <article class="about-hero card reveal">
@@ -588,6 +597,8 @@
                     <div class="feature-item"><span>◷</span><strong>Timer</strong><small>Meça seu tempo real de estudo.</small></div>
                     <div class="feature-item"><span>▥</span><strong>Progresso</strong><small>Veja sua evolução por matéria.</small></div>
                     <div class="feature-item"><span>↕</span><strong>Organização</strong><small>Reordene matérias e conteúdos.</small></div>
+                    <div class="feature-item primary-only"><span>⌁</span><strong>Trilha LP + AED</strong><small>Conecte Java, algoritmos e o livro.</small></div>
+                    <div class="feature-item primary-only"><span>▤</span><strong>Biblioteca PDF</strong><small>Leia materiais sem sair do painel.</small></div>
                 </div>
             </article>
 
@@ -616,6 +627,19 @@
 
     </main>
 </div>
+<div id="pageTransitionBar" class="page-transition-bar" aria-hidden="true"></div>
+
+<div id="floatingTimer" class="floating-timer" aria-live="polite">
+    <button id="floatingTimerOpen" class="floating-timer-main" type="button" title="Abrir Timer">
+        <span class="floating-timer-icon">◷</span>
+        <span class="floating-timer-copy">
+            <small id="floatingTimerSubject">Timer de estudos</small>
+            <strong id="floatingTimerDisplay">00:00:00</strong>
+        </span>
+    </button>
+    <button id="floatingTimerToggle" class="floating-timer-toggle" type="button" title="Iniciar timer">▶</button>
+</div>
+
 <div id="modal" class="modal hidden">
     <div class="modal-box">
         <div class="modal-header">

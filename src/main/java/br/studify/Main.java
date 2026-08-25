@@ -1,6 +1,6 @@
 package br.studify;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -8,9 +8,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
-import java.net.http.*;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.*;
@@ -36,41 +34,10 @@ public class Main {
     private static final String SECOND_PASSWORD =
         System.getenv().getOrDefault("STUDIFY_SECOND_PASSWORD", "");
 
-    private static final String OPENAI_API_KEY =
-        System.getenv().getOrDefault("OPENAI_API_KEY", "").trim();
-
-    private static final String OPENAI_MODEL =
-        System.getenv().getOrDefault("OPENAI_MODEL", "gpt-5-mini").trim();
+    private static final int MAX_PDF_BYTES = 15 * 1024 * 1024;
 
     private static final Database primaryDb = new Database();
     private static final Database secondDb = new Database("studify-julia.db", false);
-
-    private static final HttpClient httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(15))
-        .build();
-
-    private static final String TUTOR_INSTRUCTIONS = """
-        Você é o Tutor IA do Studify, usado por José Roberto para estudar
-        Laboratório de Programação (Java) e Algoritmos e Estruturas de Dados (AED).
-        Responda em português do Brasil, de forma curta, direta, simples e didática.
-        Priorize raciocínio e compreensão antes de entregar código completo.
-
-        A trilha integrada do aluno é:
-        1. Fundamentos Java -> noção de algoritmo e Big O -> Entendendo Algoritmos cap. 1.
-        2. Loops -> busca sequencial -> cap. 1.
-        3. Arrays/Vetores -> listas estáticas e busca binária -> cap. 1.
-        4. Métodos -> ordenação por seleção -> cap. 2.
-        5. Recursão -> pilha de chamadas -> cap. 3.
-        6. Divisão e conquista -> quicksort -> cap. 4.
-        7. POO/encapsulamento -> listas encadeadas, pilhas e filas -> caps. 2 e 3 como apoio.
-        8. Collections/HashMap -> tabelas hash -> cap. 5.
-        9. Classes/Queue -> árvores BST, grafos, BFS e DFS -> cap. 6 para grafos/BFS e material de AED para árvores/DFS.
-        10. PriorityQueue, exceções, arquivos e projeto -> Dijkstra, NP-Complete, gulosos e programação dinâmica -> caps. 7, 8 e 9.
-
-        Quando possível, conecte três pontos: o recurso de Java/LP, o conceito de AED
-        e a parte correspondente do livro Entendendo Algoritmos, de Aditya Y. Bhargava.
-        Se o aluno pedir exercício, dê um de cada vez e não entregue a solução imediatamente.
-        """;
 
     private static final String SESSION_COOKIE = "studify_session";
     private static final long SESSION_TTL_MS = 30L * 24 * 60 * 60 * 1000;
@@ -100,8 +67,8 @@ public class Main {
         server.createContext("/api/sessions", secured(Main::handleSessions));
         server.createContext("/api/summary", secured(Main::handleSummary));
         server.createContext("/api/study-roadmap", secured(Main::handleStudyRoadmap));
-        server.createContext("/api/tutor/history", secured(Main::handleTutorHistory));
-        server.createContext("/api/tutor/chat", secured(Main::handleTutorChat));
+        server.createContext("/api/documents", secured(Main::handleDocuments));
+        server.createContext("/api/documents/file", secured(Main::handleDocumentFile));
         server.createContext("/", Main::serveStatic);
 
         server.start();
@@ -111,7 +78,6 @@ public class Main {
         System.out.println("Porta: " + PORT);
         System.out.println("Banco principal: " + primaryDb.databasePath());
         System.out.println("Banco de " + SECOND_USER + ": " + secondDb.databasePath());
-        System.out.println("Tutor IA: " + (OPENAI_API_KEY.isBlank() ? "sem chave configurada" : "configurado"));
         System.out.println();
     }
 
@@ -710,23 +676,58 @@ public class Main {
         }
     }
 
-    private static void handleTutorHistory(HttpExchange ex) throws IOException {
+    private static void handleDocuments(HttpExchange ex) throws IOException {
         if (!ensurePrimaryUser(ex)) return;
 
         try {
             String method = ex.getRequestMethod().toUpperCase(Locale.ROOT);
 
             if ("GET".equals(method)) {
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("configured", !OPENAI_API_KEY.isBlank());
-                result.put("model", OPENAI_MODEL);
-                result.put("messages", primaryDb.chatHistory(60));
-                json(ex, 200, result);
+                json(ex, 200, primaryDb.documents());
+                return;
+            }
+
+            if ("POST".equals(method)) {
+                String contentType = ex.getRequestHeaders().getFirst("Content-Type");
+                if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("application/pdf")) {
+                    json(ex, 400, Map.of("error", "Envie um arquivo PDF válido."));
+                    return;
+                }
+
+                String name = query(ex).getOrDefault("name", "material.pdf").trim();
+                byte[] data;
+                try (InputStream in = ex.getRequestBody()) {
+                    data = in.readNBytes(MAX_PDF_BYTES + 1);
+                }
+
+                if (data.length == 0) {
+                    json(ex, 400, Map.of("error", "O PDF está vazio."));
+                    return;
+                }
+
+                if (data.length > MAX_PDF_BYTES) {
+                    json(ex, 413, Map.of("error", "O PDF deve ter no máximo 15 MB."));
+                    return;
+                }
+
+                // Assinatura mínima de um PDF: %PDF-
+                if (data.length < 5 || data[0] != '%' || data[1] != 'P' || data[2] != 'D' || data[3] != 'F' || data[4] != '-') {
+                    json(ex, 400, Map.of("error", "O arquivo enviado não parece ser um PDF válido."));
+                    return;
+                }
+
+                int id = primaryDb.addDocument(name, data);
+                json(ex, 201, Map.of("ok", true, "id", id));
                 return;
             }
 
             if ("DELETE".equals(method)) {
-                primaryDb.clearChatHistory();
+                int id = Integer.parseInt(query(ex).getOrDefault("id", "-1"));
+                if (id <= 0) {
+                    json(ex, 400, Map.of("error", "PDF inválido."));
+                    return;
+                }
+                primaryDb.deleteDocument(id);
                 json(ex, 200, Map.of("ok", true));
                 return;
             }
@@ -737,167 +738,34 @@ public class Main {
         }
     }
 
-    private static void handleTutorChat(HttpExchange ex) throws IOException {
+    private static void handleDocumentFile(HttpExchange ex) throws IOException {
         if (!ensurePrimaryUser(ex)) return;
 
-        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+        if (!"GET".equalsIgnoreCase(ex.getRequestMethod())) {
             methodNotAllowed(ex);
             return;
         }
 
-        if (OPENAI_API_KEY.isBlank()) {
-            json(ex, 503, Map.of(
-                "error",
-                "Tutor IA ainda não configurado. Adicione OPENAI_API_KEY nas variáveis de ambiente do Studify."
-            ));
-            return;
-        }
-
         try {
-            TutorChatRequest body = gson.fromJson(readBody(ex), TutorChatRequest.class);
-            String message = body == null || body.message() == null
-                ? ""
-                : body.message().trim();
-
-            if (message.isBlank()) {
-                json(ex, 400, Map.of("error", "Digite uma mensagem para o tutor."));
+            int id = Integer.parseInt(query(ex).getOrDefault("id", "-1"));
+            Database.StoredDocument document = primaryDb.document(id);
+            if (document == null) {
+                json(ex, 404, Map.of("error", "PDF não encontrado."));
                 return;
             }
 
-            if (message.length() > 6000) {
-                json(ex, 400, Map.of("error", "A mensagem está muito longa."));
-                return;
-            }
-
-            List<Database.ChatMessage> history = primaryDb.chatHistory(14);
-            String reply = callOpenAI(history, message);
-
-            primaryDb.addChatMessage("user", message);
-            primaryDb.addChatMessage("assistant", reply);
-
-            json(ex, 200, Map.of(
-                "reply", reply,
-                "model", OPENAI_MODEL
-            ));
+            applySecurityHeaders(ex);
+            ex.getResponseHeaders().set("X-Frame-Options", "SAMEORIGIN");
+            ex.getResponseHeaders().set("Content-Type", "application/pdf");
+            ex.getResponseHeaders().set("Content-Disposition", "inline");
+            ex.getResponseHeaders().set("Cache-Control", "private, no-store");
+            ex.sendResponseHeaders(200, document.data().length);
+            ex.getResponseBody().write(document.data());
+            ex.close();
         } catch (Exception e) {
-            json(ex, 502, Map.of("error", safeOpenAIMessage(e)));
+            json(ex, 400, Map.of("error", safeMessage(e)));
         }
     }
-
-    private static String callOpenAI(
-        List<Database.ChatMessage> history,
-        String message
-    ) throws Exception {
-        JsonObject requestBody = new JsonObject();
-        requestBody.addProperty("model", OPENAI_MODEL);
-        requestBody.addProperty("instructions", TUTOR_INSTRUCTIONS);
-        requestBody.addProperty("max_output_tokens", 1200);
-        requestBody.addProperty("store", false);
-
-        JsonArray input = new JsonArray();
-
-        for (Database.ChatMessage previous : history) {
-            JsonObject item = new JsonObject();
-            item.addProperty("role", previous.role());
-            item.addProperty("content", previous.content());
-            input.add(item);
-        }
-
-        JsonObject current = new JsonObject();
-        current.addProperty("role", "user");
-        current.addProperty("content", message);
-        input.add(current);
-
-        requestBody.add("input", input);
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create("https://api.openai.com/v1/responses"))
-            .timeout(Duration.ofSeconds(75))
-            .header("Authorization", "Bearer " + OPENAI_API_KEY)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(
-                gson.toJson(requestBody),
-                StandardCharsets.UTF_8
-            ))
-            .build();
-
-        HttpResponse<String> response;
-        try {
-            response = httpClient.send(
-                request,
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
-            );
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("A chamada ao Tutor IA foi interrompida.");
-        }
-
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new RuntimeException(extractOpenAIError(response.body()));
-        }
-
-        String text = extractOpenAIText(response.body());
-        if (text.isBlank()) {
-            throw new RuntimeException("A OpenAI não retornou uma resposta de texto.");
-        }
-
-        return text.trim();
-    }
-
-    private static String extractOpenAIText(String responseBody) {
-        JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
-        StringBuilder text = new StringBuilder();
-
-        JsonArray output = root.has("output") && root.get("output").isJsonArray()
-            ? root.getAsJsonArray("output")
-            : new JsonArray();
-
-        for (JsonElement outputElement : output) {
-            if (!outputElement.isJsonObject()) continue;
-            JsonObject outputItem = outputElement.getAsJsonObject();
-            if (!outputItem.has("content") || !outputItem.get("content").isJsonArray()) continue;
-
-            for (JsonElement contentElement : outputItem.getAsJsonArray("content")) {
-                if (!contentElement.isJsonObject()) continue;
-                JsonObject content = contentElement.getAsJsonObject();
-                String type = content.has("type") ? content.get("type").getAsString() : "";
-
-                if ("output_text".equals(type) && content.has("text")) {
-                    if (!text.isEmpty()) text.append("\n");
-                    text.append(content.get("text").getAsString());
-                } else if ("refusal".equals(type) && content.has("refusal")) {
-                    if (!text.isEmpty()) text.append("\n");
-                    text.append(content.get("refusal").getAsString());
-                }
-            }
-        }
-
-        return text.toString();
-    }
-
-    private static String extractOpenAIError(String responseBody) {
-        try {
-            JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
-            if (root.has("error") && root.get("error").isJsonObject()) {
-                JsonObject error = root.getAsJsonObject("error");
-                if (error.has("message")) {
-                    return "OpenAI: " + error.get("message").getAsString();
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        return "Não foi possível obter resposta do Tutor IA.";
-    }
-
-    private static String safeOpenAIMessage(Exception e) {
-        String message = safeMessage(e);
-        if (message.contains("401") || message.toLowerCase(Locale.ROOT).contains("api key")) {
-            return "A chave OPENAI_API_KEY não foi aceita. Verifique a variável no ambiente.";
-        }
-        return message;
-    }
-
 
     private static void serveStatic(HttpExchange ex) throws IOException {
         applySecurityHeaders(ex);
@@ -1086,6 +954,5 @@ public class Main {
         boolean completed
     ) {}
 
-    public record TutorChatRequest(String message) {}
 
 }
