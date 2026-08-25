@@ -12,6 +12,10 @@ const state = {
     currentSubject: null,
     organizeSubject: null,
     notes: [],
+    currentUser: null,
+    isPrimary: false,
+    roadmapProgress: {},
+    tutorConfigured: false,
     timer: {
         seconds: 0,
         interval: null,
@@ -35,6 +39,19 @@ const reviewList = document.getElementById("reviewList");
 const notesList = document.getElementById("notesList");
 const sessionList = document.getElementById("sessionList");
 const progressList = document.getElementById("progressList");
+const userWelcome = document.getElementById("userWelcome");
+const homeUserExtras = document.getElementById("homeUserExtras");
+const studyRoadmapList = document.getElementById("studyRoadmapList");
+const studyPathPercentage = document.getElementById("studyPathPercentage");
+const studyPathProgressLabel = document.getElementById("studyPathProgressLabel");
+const studyPathProgressBar = document.getElementById("studyPathProgressBar");
+const openTutorFromRoadmap = document.getElementById("openTutorFromRoadmap");
+const tutorMessages = document.getElementById("tutorMessages");
+const tutorForm = document.getElementById("tutorForm");
+const tutorInput = document.getElementById("tutorInput");
+const tutorSendBtn = document.getElementById("tutorSendBtn");
+const clearTutorHistory = document.getElementById("clearTutorHistory");
+const tutorConfigNotice = document.getElementById("tutorConfigNotice");
 
 const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modalTitle");
@@ -180,6 +197,14 @@ window.goToPage = async function(pageName) {
     if (pageName === "progress") {
         await loadProgress();
     }
+
+    if (pageName === "studyPath") {
+        await loadStudyRoadmap();
+    }
+
+    if (pageName === "tutor") {
+        await loadTutorHistory();
+    }
 };
 
 navButtons.forEach(button => {
@@ -187,6 +212,439 @@ navButtons.forEach(button => {
         await window.goToPage(button.dataset.page);
     });
 });
+
+
+const integratedStudyRoadmap = [
+    {
+        id: "stage-1",
+        title: "1. Fundamentos",
+        java: "Estrutura do programa, variáveis, tipos e condicionais",
+        aed: "Noção de algoritmo e análise de complexidade (Big O)",
+        book: "Capítulo 1 — Introdução a algoritmos",
+        goal: "Entender como um algoritmo vira código Java e começar a comparar eficiência.",
+        steps: [
+            ["s1-java", "LP/Java: revisar classe, main, variáveis, tipos e if/else."],
+            ["s1-aed", "AED: entender algoritmo, entrada, processamento, saída e Big O."],
+            ["s1-book", "Livro: estudar o Cap. 1 até entender busca binária e Big O."],
+            ["s1-practice", "Prática: escrever exemplos simples e comparar busca linear x busca binária no papel."]
+        ]
+    },
+    {
+        id: "stage-2",
+        title: "2. Loops",
+        java: "for, while e do-while",
+        aed: "Busca sequencial e percursos",
+        book: "Capítulo 1 — reforço",
+        goal: "Usar repetição para percorrer dados e perceber o custo de examinar item por item.",
+        steps: [
+            ["s2-java", "LP/Java: dominar for e while; depois praticar do-while."],
+            ["s2-aed", "AED: implementar mentalmente a busca sequencial e identificar o pior caso."],
+            ["s2-book", "Livro: revisar o contraste entre busca simples e busca binária."],
+            ["s2-practice", "Prática: percorrer valores e procurar um elemento usando loop."]
+        ]
+    },
+    {
+        id: "stage-3",
+        title: "3. Arrays e Vetores",
+        java: "Arrays, índices, leitura e alteração de posições",
+        aed: "Busca binária em dados ordenados",
+        book: "Capítulo 1",
+        goal: "Entender a estrutura onde vários algoritmos básicos operam.",
+        steps: [
+            ["s3-java", "LP/Java: criar, preencher e percorrer arrays."],
+            ["s3-aed", "AED: entender pré-condição de ordenação e lógica da busca binária."],
+            ["s3-book", "Livro: refazer o exemplo de busca binária passo a passo."],
+            ["s3-practice", "Prática: implementar busca sequencial e depois busca binária em Java."]
+        ]
+    },
+    {
+        id: "stage-4",
+        title: "4. Métodos",
+        java: "Parâmetros, retorno e decomposição de problemas",
+        aed: "Modularização de algoritmos",
+        book: "Capítulo 2 — Ordenação por seleção",
+        goal: "Transformar partes do algoritmo em métodos pequenos e reutilizáveis.",
+        steps: [
+            ["s4-java", "LP/Java: criar métodos com parâmetros e retorno."],
+            ["s4-aed", "AED: separar busca, comparação e troca em operações menores."],
+            ["s4-book", "Livro: iniciar o Cap. 2 e entender o raciocínio da seleção."],
+            ["s4-practice", "Prática: criar métodos para buscar menor valor, trocar posições e imprimir vetor."]
+        ]
+    },
+    {
+        id: "stage-5",
+        title: "5. Ordenação",
+        java: "Arrays + loops + métodos",
+        aed: "Ordenação por seleção e custo O(n²)",
+        book: "Capítulo 2",
+        goal: "Conectar código de manipulação de vetor com um algoritmo clássico de ordenação.",
+        steps: [
+            ["s5-java", "LP/Java: combinar loops aninhados, arrays e métodos."],
+            ["s5-aed", "AED: acompanhar cada seleção do menor elemento."],
+            ["s5-book", "Livro: concluir o Cap. 2 e entender por que a seleção é O(n²)."],
+            ["s5-practice", "Prática: implementar ordenação por seleção sem copiar a solução do livro."]
+        ]
+    },
+    {
+        id: "stage-6",
+        title: "6. Recursão",
+        java: "Métodos que chamam a si mesmos",
+        aed: "Caso-base, pilha de chamadas e recursão",
+        book: "Capítulo 3 — Recursão",
+        goal: "Entender quando uma solução pode ser definida em termos de uma versão menor do problema.",
+        steps: [
+            ["s6-java", "LP/Java: entender chamada de método, retorno e caso-base."],
+            ["s6-aed", "AED: visualizar a pilha de chamadas."],
+            ["s6-book", "Livro: estudar o Cap. 3 inteiro."],
+            ["s6-practice", "Prática: contagem regressiva, fatorial e soma recursiva simples."]
+        ]
+    },
+    {
+        id: "stage-7",
+        title: "7. POO e Estruturas Lineares",
+        java: "Classes, objetos, referências e encapsulamento",
+        aed: "Listas encadeadas, pilhas e filas",
+        book: "Capítulos 2 e 3 como apoio",
+        goal: "Usar objetos para representar nós e entender estruturas que não dependem apenas de arrays.",
+        steps: [
+            ["s7-java", "LP/Java: dominar classes, objetos, atributos, métodos e encapsulamento."],
+            ["s7-list", "AED: entender lista encadeada e a ideia de nó + referência para o próximo."],
+            ["s7-stack", "AED: revisar pilha (LIFO) e relacionar com a pilha de chamadas do Cap. 3."],
+            ["s7-queue", "AED: entender fila (FIFO) e suas operações básicas."],
+            ["s7-practice", "Prática: criar uma classe Node e implementar uma estrutura linear simples em Java."]
+        ]
+    },
+    {
+        id: "stage-8",
+        title: "8. Collections e Tabelas Hash",
+        java: "ArrayList, Map e HashMap",
+        aed: "Tabelas hash, chave/valor, colisões e busca",
+        book: "Capítulo 5 — Tabelas hash",
+        goal: "Entender estruturas dinâmicas e por que hashing permite buscas muito rápidas em média.",
+        steps: [
+            ["s8-java", "LP/Java: praticar ArrayList, Map e HashMap."],
+            ["s8-aed", "AED: entender função hash, chave/valor, colisões e casos de uso."],
+            ["s8-book", "Livro: estudar o Cap. 5."],
+            ["s8-practice", "Prática: criar um cadastro com HashMap e comparar a ideia com busca em array."]
+        ]
+    },
+    {
+        id: "stage-9",
+        title: "9. Árvores e Grafos",
+        java: "Classes, referências, Queue e Collections",
+        aed: "BST, busca em árvores, grafos, BFS e DFS",
+        book: "Capítulo 6 para grafos/BFS + material de AED para árvores e DFS",
+        goal: "Representar relações e estruturas hierárquicas usando objetos e coleções.",
+        steps: [
+            ["s9-tree", "AED: entender árvore de busca binária (BST) e suas propriedades."],
+            ["s9-tree-search", "AED: praticar busca em árvore e comparar com busca em vetor."],
+            ["s9-graph", "AED: entender vértices, arestas e formas de representar grafos."],
+            ["s9-book", "Livro: estudar o Cap. 6 e entender BFS."],
+            ["s9-searches", "AED/Java: implementar BFS com Queue e estudar DFS como complemento." ]
+        ]
+    },
+    {
+        id: "stage-10",
+        title: "10. Caminhos, Estratégias e Projeto",
+        java: "PriorityQueue, exceções, arquivos e projeto final",
+        aed: "Dijkstra, NP-Complete, algoritmos gulosos e programação dinâmica",
+        book: "Capítulos 7, 8 e 9",
+        goal: "Fechar a conexão entre LP e AED implementando algoritmos maiores e um projeto integrado.",
+        steps: [
+            ["s10-dijkstra", "AED/Java: estudar Dijkstra e implementar com PriorityQueue quando estiver confortável."],
+            ["s10-greedy", "Livro/AED: estudar algoritmos gulosos no Cap. 8."],
+            ["s10-np", "AED: relacionar NP-Complete com os limites de soluções exatas e o Cap. 8."],
+            ["s10-dp", "Livro/AED: estudar programação dinâmica no Cap. 9."],
+            ["s10-java", "LP/Java: usar tratamento de exceções e arquivos para tornar o projeto mais completo."],
+            ["s10-project", "Projeto final: montar uma aplicação Java que use pelo menos duas estruturas/algoritmos estudados."]
+        ]
+    }
+];
+
+function isPrimaryProfile() {
+    return Boolean(state.isPrimary);
+}
+
+async function loadCurrentUser() {
+    const auth = await api("/api/auth/status");
+    state.currentUser = auth.username || null;
+    state.isPrimary = Boolean(auth.primary);
+    configureUserExperience();
+}
+
+function configureUserExperience() {
+    const username = String(state.currentUser || "").toLowerCase();
+    const primary = Boolean(state.isPrimary);
+
+    document.querySelectorAll(".primary-only").forEach(element => {
+        element.classList.toggle("hidden", !primary);
+    });
+
+    if (userWelcome) {
+        if (primary) {
+            userWelcome.innerHTML = `
+                <span class="welcome-spark">✦</span>
+                <strong>Bem-Vindo José Roberto</strong>
+                <span class="welcome-spark">✦</span>
+            `;
+        } else if (username === "julia") {
+            userWelcome.innerHTML = `
+                <span class="welcome-spark">✦</span>
+                <strong>Bem-Vinda Júlia</strong>
+                <span class="welcome-spark">✦</span>
+            `;
+        } else {
+            userWelcome.innerHTML = `
+                <span class="welcome-spark">✦</span>
+                <strong>Bem-vindo ao Studify</strong>
+                <span class="welcome-spark">✦</span>
+            `;
+        }
+    }
+
+    if (homeUserExtras) {
+        if (username === "julia") {
+            homeUserExtras.innerHTML = `
+                <article class="card user-extra-card julia-drive-card reveal">
+                    <div>
+                        <span class="roadmap-kicker">ACESSO DA JÚLIA</span>
+                        <h3>Materiais no Google Drive</h3>
+                        <p>Abra sua pasta de estudos diretamente pelo Studify.</p>
+                    </div>
+                    <a class="primary link-button" href="https://drive.google.com/drive/folders/1BWLSbVYAEcY1YW4-bP8C-IBBWzzX4bDu?usp=sharing" target="_blank" rel="noopener noreferrer">Abrir Google Drive ↗</a>
+                </article>
+            `;
+        } else if (primary) {
+            homeUserExtras.innerHTML = `
+                <article class="card user-extra-card roberto-study-card reveal">
+                    <div>
+                        <span class="roadmap-kicker">NOVA ÁREA DE ESTUDO</span>
+                        <h3>LP + AED + Entendendo Algoritmos</h3>
+                        <p>Siga a trilha integrada e converse com o Tutor IA quando surgir uma dúvida.</p>
+                    </div>
+                    <div class="user-extra-actions">
+                        <button class="primary" type="button" onclick="goToPage('studyPath')">Abrir trilha</button>
+                        <button class="secondary" type="button" onclick="goToPage('tutor')">Tutor IA</button>
+                    </div>
+                </article>
+            `;
+        } else {
+            homeUserExtras.innerHTML = "";
+        }
+    }
+}
+
+async function loadStudyRoadmap() {
+    if (!isPrimaryProfile()) return;
+    const data = await api("/api/study-roadmap");
+    state.roadmapProgress = data.progress || {};
+    renderStudyRoadmap();
+}
+
+function renderStudyRoadmap() {
+    if (!studyRoadmapList) return;
+
+    const allSteps = integratedStudyRoadmap.flatMap(stage => stage.steps);
+    const completed = allSteps.filter(([key]) => state.roadmapProgress[key]).length;
+    const percentage = allSteps.length ? Math.round((completed / allSteps.length) * 100) : 0;
+
+    studyPathPercentage.textContent = `${percentage}%`;
+    studyPathProgressLabel.textContent = `${completed} de ${allSteps.length} passos concluídos`;
+    studyPathProgressBar.style.width = `${percentage}%`;
+
+    studyRoadmapList.innerHTML = integratedStudyRoadmap.map((stage, index) => {
+        const stageDone = stage.steps.filter(([key]) => state.roadmapProgress[key]).length;
+        const stageComplete = stageDone === stage.steps.length;
+
+        return `
+            <article class="card integrated-stage ${stageComplete ? "complete" : ""}">
+                <div class="integrated-stage-number">${index + 1}</div>
+                <div class="integrated-stage-main">
+                    <div class="integrated-stage-head">
+                        <div>
+                            <h3>${escapeHtml(stage.title)}</h3>
+                            <p>${escapeHtml(stage.goal)}</p>
+                        </div>
+                        <span class="stage-counter">${stageDone}/${stage.steps.length}</span>
+                    </div>
+
+                    <div class="study-bridge-grid">
+                        <div><span>LP / Java</span><strong>${escapeHtml(stage.java)}</strong></div>
+                        <div><span>AED</span><strong>${escapeHtml(stage.aed)}</strong></div>
+                        <div><span>Livro</span><strong>${escapeHtml(stage.book)}</strong></div>
+                    </div>
+
+                    <div class="stage-steps">
+                        ${stage.steps.map(([key, label]) => `
+                            <label class="stage-step ${state.roadmapProgress[key] ? "done" : ""}">
+                                <input type="checkbox" data-roadmap-key="${escapeHtml(key)}" ${state.roadmapProgress[key] ? "checked" : ""}>
+                                <span>${escapeHtml(label)}</span>
+                            </label>
+                        `).join("")}
+                    </div>
+
+                    <button
+                        class="stage-tutor-button"
+                        type="button"
+                        data-stage-tutor="${index}"
+                    >
+                        ✦ Conversar com o Tutor sobre esta etapa
+                    </button>
+                </div>
+            </article>
+        `;
+    }).join("");
+}
+
+if (studyRoadmapList) {
+    studyRoadmapList.addEventListener("change", async event => {
+        const checkbox = event.target.closest("[data-roadmap-key]");
+        if (!checkbox) return;
+
+        const key = checkbox.dataset.roadmapKey;
+        state.roadmapProgress[key] = checkbox.checked;
+
+        try {
+            await api("/api/study-roadmap", {
+                method: "PUT",
+                body: JSON.stringify({ itemKey: key, completed: checkbox.checked })
+            });
+            renderStudyRoadmap();
+        } catch (error) {
+            state.roadmapProgress[key] = !checkbox.checked;
+            renderStudyRoadmap();
+            showToast(error.message);
+        }
+    });
+
+    studyRoadmapList.addEventListener("click", async event => {
+        const button = event.target.closest("[data-stage-tutor]");
+        if (!button) return;
+
+        const stage = integratedStudyRoadmap[Number(button.dataset.stageTutor)];
+        if (!stage) return;
+
+        await window.goToPage("tutor");
+        tutorInput.value = `Estou na etapa "${stage.title}". Me explique como conectar LP/Java (${stage.java}) com AED (${stage.aed}) e com ${stage.book}, e me diga o próximo passo prático.`;
+        tutorInput.focus();
+    });
+}
+
+if (openTutorFromRoadmap) {
+    openTutorFromRoadmap.addEventListener("click", () => window.goToPage("tutor"));
+}
+
+function renderTutorMessages(messages) {
+    if (!tutorMessages) return;
+
+    if (!messages.length) {
+        tutorMessages.innerHTML = `
+            <div class="tutor-empty">
+                <span>✦</span>
+                <strong>Seu tutor está pronto.</strong>
+                <p>Pergunte sobre Java, AED ou uma etapa da trilha.</p>
+            </div>
+        `;
+        return;
+    }
+
+    tutorMessages.innerHTML = "";
+
+    messages.forEach(message => {
+        const wrapper = document.createElement("div");
+        wrapper.className = `tutor-message ${message.role === "user" ? "user" : "assistant"}`;
+
+        const label = document.createElement("small");
+        label.textContent = message.role === "user" ? "Você" : "Tutor IA";
+
+        const content = document.createElement("div");
+        content.className = "tutor-message-content";
+        content.textContent = message.content;
+
+        wrapper.append(label, content);
+        tutorMessages.appendChild(wrapper);
+    });
+
+    tutorMessages.scrollTop = tutorMessages.scrollHeight;
+}
+
+async function loadTutorHistory() {
+    if (!isPrimaryProfile() || !tutorMessages) return;
+
+    const data = await api("/api/tutor/history");
+    state.tutorConfigured = Boolean(data.configured);
+    renderTutorMessages(data.messages || []);
+
+    if (tutorConfigNotice) {
+        if (state.tutorConfigured) {
+            tutorConfigNotice.classList.add("hidden");
+            tutorConfigNotice.textContent = "";
+        } else {
+            tutorConfigNotice.classList.remove("hidden");
+            tutorConfigNotice.innerHTML = `
+                <strong>Falta configurar a OpenAI API.</strong>
+                <span>Adicione a variável <code>OPENAI_API_KEY</code> no ambiente do Studify. O passo a passo está no arquivo GUIA_PASSO_A_PASSO.md.</span>
+            `;
+        }
+    }
+
+    if (tutorSendBtn) tutorSendBtn.disabled = !state.tutorConfigured;
+}
+
+async function sendTutorMessage(message) {
+    if (!message.trim() || !state.tutorConfigured) return;
+
+    const historyData = await api("/api/tutor/history");
+    const optimistic = [
+        ...(historyData.messages || []),
+        { role: "user", content: message },
+        { role: "assistant", content: "Pensando…" }
+    ];
+    renderTutorMessages(optimistic);
+
+    tutorSendBtn.disabled = true;
+    tutorInput.disabled = true;
+
+    try {
+        await api("/api/tutor/chat", {
+            method: "POST",
+            body: JSON.stringify({ message })
+        });
+        tutorInput.value = "";
+        await loadTutorHistory();
+    } catch (error) {
+        showToast(error.message || "Não foi possível falar com o Tutor IA.");
+        await loadTutorHistory();
+    } finally {
+        tutorInput.disabled = false;
+        tutorSendBtn.disabled = !state.tutorConfigured;
+        tutorInput.focus();
+    }
+}
+
+if (tutorForm) {
+    tutorForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        await sendTutorMessage(tutorInput.value);
+    });
+}
+
+document.querySelectorAll("[data-tutor-prompt]").forEach(button => {
+    button.addEventListener("click", () => {
+        if (!tutorInput) return;
+        tutorInput.value = button.dataset.tutorPrompt;
+        tutorInput.focus();
+    });
+});
+
+if (clearTutorHistory) {
+    clearTutorHistory.addEventListener("click", async () => {
+        if (!confirm("Limpar todo o histórico do Tutor IA?")) return;
+        await api("/api/tutor/history", { method: "DELETE" });
+        await loadTutorHistory();
+        showToast("Conversa apagada.");
+    });
+}
 
 function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
@@ -1871,6 +2329,7 @@ async function initApp() {
     restoreTimerLocally();
 
     try {
+        await loadCurrentUser();
         await loadSubjects();
         await loadStudySummary();
     } catch (error) {

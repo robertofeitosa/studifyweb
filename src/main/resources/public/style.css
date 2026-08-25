@@ -91,6 +91,8 @@ button {
     min-height: 100vh;
     position: sticky;
     top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
     transition: background .25s ease;
 }
 
@@ -1622,4 +1624,466 @@ button:disabled {
     background: rgba(127, 29, 29, .3);
     border-color: rgba(248, 113, 113, .55);
     transform: translateY(-1px);
+}
+
+/* Perfil, trilha integrada e Tutor IA */
+.sidebar nav {
+    min-height: 0;
+}
+
+.welcome-banner {
+    margin: -8px auto 24px;
+    width: min(760px, 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 22px;
+    border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
+    border-radius: 18px;
+    background:
+        linear-gradient(120deg, color-mix(in srgb, var(--primary-soft) 72%, transparent), transparent),
+        var(--card);
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.welcome-banner strong {
+    font-size: clamp(18px, 2.4vw, 26px);
+    letter-spacing: -.02em;
+}
+
+.welcome-spark {
+    color: var(--primary);
+    animation: welcomeSpark 2.2s ease-in-out infinite;
+}
+
+@keyframes welcomeSpark {
+    0%, 100% { transform: scale(.9) rotate(0deg); opacity: .65; }
+    50% { transform: scale(1.18) rotate(12deg); opacity: 1; }
+}
+
+.user-extra-card {
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    overflow: hidden;
+    position: relative;
+}
+
+.user-extra-card::after {
+    content: "";
+    position: absolute;
+    right: -55px;
+    top: -75px;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    pointer-events: none;
+}
+
+.user-extra-card h3,
+.study-path-hero h3,
+.integrated-stage h3 {
+    margin: 5px 0 7px;
+}
+
+.user-extra-card p,
+.study-path-hero p,
+.integrated-stage p {
+    margin: 0;
+    color: var(--muted);
+}
+
+.user-extra-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+}
+
+.link-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    position: relative;
+    z-index: 1;
+}
+
+.study-path-hero {
+    display: grid;
+    grid-template-columns: 1.4fr .8fr;
+    gap: 28px;
+    align-items: center;
+    margin-bottom: 20px;
+    background:
+        radial-gradient(circle at 85% 15%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 35%),
+        var(--card);
+}
+
+.study-path-progress {
+    display: grid;
+    gap: 7px;
+}
+
+.study-path-progress > strong {
+    font-size: 38px;
+    line-height: 1;
+}
+
+.study-path-progress > span {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.study-roadmap-list {
+    display: grid;
+    gap: 18px;
+}
+
+.integrated-stage {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    gap: 18px;
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.integrated-stage:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+}
+
+.integrated-stage.complete {
+    border-color: color-mix(in srgb, var(--success) 50%, var(--border));
+}
+
+.integrated-stage-number {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: 900;
+    font-size: 18px;
+}
+
+.integrated-stage.complete .integrated-stage-number {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.integrated-stage-main {
+    min-width: 0;
+}
+
+.integrated-stage-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.stage-counter {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--card-soft);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.study-bridge-grid {
+    margin: 18px 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.study-bridge-grid > div {
+    padding: 13px;
+    border-radius: 13px;
+    border: 1px solid var(--border);
+    background: var(--card-soft);
+    display: grid;
+    gap: 5px;
+}
+
+.study-bridge-grid span {
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.study-bridge-grid strong {
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.stage-steps {
+    display: grid;
+    gap: 8px;
+}
+
+.stage-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--card-soft) 80%, transparent);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: border-color .18s ease, background .18s ease;
+}
+
+.stage-step:hover {
+    border-color: var(--border);
+}
+
+.stage-step input {
+    margin-top: 3px;
+    accent-color: var(--success);
+}
+
+.stage-step span {
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+.stage-step.done {
+    background: var(--success-soft);
+}
+
+.stage-step.done span {
+    text-decoration: line-through;
+    opacity: .72;
+}
+
+.stage-tutor-button {
+    margin-top: 14px;
+    border: 0;
+    background: transparent;
+    color: var(--primary);
+    font-weight: 800;
+    padding: 6px 0;
+}
+
+.stage-tutor-button:hover {
+    text-decoration: underline;
+}
+
+.tutor-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.tutor-config {
+    margin: 18px 18px 0;
+    padding: 13px 15px;
+    border-radius: 13px;
+    background: var(--warning-soft);
+    color: var(--text);
+    display: grid;
+    gap: 4px;
+    border: 1px solid color-mix(in srgb, var(--warning) 25%, var(--border));
+}
+
+.tutor-config span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.tutor-suggestions {
+    padding: 18px 18px 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.tutor-suggestions button {
+    border: 1px solid var(--border);
+    background: var(--card-soft);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 8px 11px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.tutor-suggestions button:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tutor-messages {
+    height: min(58vh, 590px);
+    min-height: 360px;
+    overflow-y: auto;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--card-soft) 55%, transparent), transparent 40%),
+        var(--card);
+}
+
+.tutor-message {
+    max-width: min(82%, 760px);
+    display: grid;
+    gap: 5px;
+}
+
+.tutor-message.user {
+    align-self: flex-end;
+}
+
+.tutor-message.assistant {
+    align-self: flex-start;
+}
+
+.tutor-message small {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.tutor-message.user small {
+    text-align: right;
+}
+
+.tutor-message-content {
+    padding: 12px 14px;
+    border-radius: 16px;
+    white-space: pre-wrap;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    background: var(--card-soft);
+    border: 1px solid var(--border);
+}
+
+.tutor-message.user .tutor-message-content {
+    background: var(--primary);
+    color: white;
+    border-color: transparent;
+    border-bottom-right-radius: 5px;
+}
+
+.tutor-message.assistant .tutor-message-content {
+    border-bottom-left-radius: 5px;
+}
+
+.tutor-empty {
+    margin: auto;
+    text-align: center;
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+}
+
+.tutor-empty > span {
+    font-size: 30px;
+    color: var(--primary);
+}
+
+.tutor-empty strong {
+    color: var(--text);
+}
+
+.tutor-empty p {
+    margin: 0;
+}
+
+.tutor-form {
+    border-top: 1px solid var(--border);
+    padding: 16px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: end;
+}
+
+.tutor-form textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 62px;
+    max-height: 180px;
+    border: 1px solid var(--border);
+    background: var(--card-soft);
+    color: var(--text);
+    border-radius: 13px;
+    padding: 12px 13px;
+    outline: none;
+}
+
+.tutor-form textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.tutor-footnote {
+    margin: 0;
+    padding: 0 18px 15px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+@media (max-width: 950px) {
+    .user-extra-card,
+    .study-path-hero {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .study-bridge-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .welcome-banner {
+        margin-top: 0;
+    }
+
+    .integrated-stage {
+        grid-template-columns: 1fr;
+    }
+
+    .integrated-stage-number {
+        width: 42px;
+        height: 42px;
+    }
+
+    .integrated-stage-head {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .tutor-messages {
+        min-height: 330px;
+        height: 52vh;
+        padding: 14px;
+    }
+
+    .tutor-message {
+        max-width: 94%;
+    }
+
+    .tutor-form {
+        grid-template-columns: 1fr;
+    }
 }

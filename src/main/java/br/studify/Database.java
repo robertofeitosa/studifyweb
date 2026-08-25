@@ -134,6 +134,23 @@ public class Database {
                     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE SET NULL
                 )
             """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS roadmap_progress (
+                    item_key TEXT PRIMARY KEY,
+                    completed INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """);
         } catch (SQLException e) {
             throw new RuntimeException("Erro ao criar banco: " + e.getMessage(), e);
         }
@@ -730,6 +747,108 @@ public class Database {
         return new StudySummary(subjects, contents, totalSeconds, sessions);
     }
 
+    public Map<String, Boolean> roadmapProgress() {
+        Map<String, Boolean> progress = new LinkedHashMap<>();
+
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement(
+                 "SELECT item_key, completed FROM roadmap_progress ORDER BY item_key");
+             ResultSet r = p.executeQuery()) {
+
+            while (r.next()) {
+                progress.put(r.getString("item_key"), r.getInt("completed") == 1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return progress;
+    }
+
+    public void setRoadmapProgress(String itemKey, boolean completed) {
+        if (itemKey == null || itemKey.isBlank() || itemKey.length() > 120) {
+            throw new RuntimeException("Item de roadmap inválido.");
+        }
+
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement("""
+                 INSERT INTO roadmap_progress(item_key, completed, updated_at)
+                 VALUES(?, ?, ?)
+                 ON CONFLICT(item_key) DO UPDATE SET
+                     completed=excluded.completed,
+                     updated_at=excluded.updated_at
+             """)) {
+            p.setString(1, itemKey.trim());
+            p.setInt(2, completed ? 1 : 0);
+            p.setString(3, LocalDateTime.now().toString());
+            p.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public List<ChatMessage> chatHistory(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        List<ChatMessage> reversed = new ArrayList<>();
+
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement("""
+                 SELECT id, role, content, created_at
+                 FROM chat_messages
+                 ORDER BY id DESC
+                 LIMIT ?
+             """)) {
+            p.setInt(1, safeLimit);
+
+            try (ResultSet r = p.executeQuery()) {
+                while (r.next()) {
+                    reversed.add(new ChatMessage(
+                        r.getInt("id"),
+                        r.getString("role"),
+                        r.getString("content"),
+                        r.getString("created_at")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        Collections.reverse(reversed);
+        return reversed;
+    }
+
+    public void addChatMessage(String role, String content) {
+        if (!("user".equals(role) || "assistant".equals(role))) {
+            throw new RuntimeException("Papel de mensagem inválido.");
+        }
+
+        String text = content == null ? "" : content.trim();
+        if (text.isBlank()) return;
+
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement("""
+                 INSERT INTO chat_messages(role, content, created_at)
+                 VALUES(?, ?, ?)
+             """)) {
+            p.setString(1, role);
+            p.setString(2, text);
+            p.setString(3, LocalDateTime.now().toString());
+            p.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void clearChatHistory() {
+        try (Connection c = connect();
+             PreparedStatement p = c.prepareStatement("DELETE FROM chat_messages")) {
+            p.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private record ContentRow(int id, int position) {}
 
     public record Subject(int id, String name, int position) {}
@@ -739,4 +858,5 @@ public class Database {
     public record Note(int id, String title, String body, String subject, String createdAt, String updatedAt) {}
     public record StudySession(int id, String subject, int durationSeconds, String studiedAt) {}
     public record StudySummary(int subjects, int contents, int totalSeconds, int sessions) {}
+    public record ChatMessage(int id, String role, String content, String createdAt) {}
 }

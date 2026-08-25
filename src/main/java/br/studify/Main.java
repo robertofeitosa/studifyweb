@@ -1,6 +1,6 @@
 package br.studify;
 
-import com.google.gson.Gson;
+import com.google.gson.*;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -8,7 +8,9 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
+import java.net.http.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.*;
@@ -34,15 +36,41 @@ public class Main {
     private static final String SECOND_PASSWORD =
         System.getenv().getOrDefault("STUDIFY_SECOND_PASSWORD", "");
 
-    private static final String THIRD_USER =
-        System.getenv().getOrDefault("STUDIFY_THIRD_USER", "teste").trim();
+    private static final String OPENAI_API_KEY =
+        System.getenv().getOrDefault("OPENAI_API_KEY", "").trim();
 
-    private static final String THIRD_PASSWORD =
-        System.getenv().getOrDefault("STUDIFY_THIRD_PASSWORD", "");
+    private static final String OPENAI_MODEL =
+        System.getenv().getOrDefault("OPENAI_MODEL", "gpt-5-mini").trim();
 
     private static final Database primaryDb = new Database();
     private static final Database secondDb = new Database("studify-julia.db", false);
-    private static final Database thirdDb = new Database("studify-teste.db", false);
+
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(15))
+        .build();
+
+    private static final String TUTOR_INSTRUCTIONS = """
+        Você é o Tutor IA do Studify, usado por José Roberto para estudar
+        Laboratório de Programação (Java) e Algoritmos e Estruturas de Dados (AED).
+        Responda em português do Brasil, de forma curta, direta, simples e didática.
+        Priorize raciocínio e compreensão antes de entregar código completo.
+
+        A trilha integrada do aluno é:
+        1. Fundamentos Java -> noção de algoritmo e Big O -> Entendendo Algoritmos cap. 1.
+        2. Loops -> busca sequencial -> cap. 1.
+        3. Arrays/Vetores -> listas estáticas e busca binária -> cap. 1.
+        4. Métodos -> ordenação por seleção -> cap. 2.
+        5. Recursão -> pilha de chamadas -> cap. 3.
+        6. Divisão e conquista -> quicksort -> cap. 4.
+        7. POO/encapsulamento -> listas encadeadas, pilhas e filas -> caps. 2 e 3 como apoio.
+        8. Collections/HashMap -> tabelas hash -> cap. 5.
+        9. Classes/Queue -> árvores BST, grafos, BFS e DFS -> cap. 6 para grafos/BFS e material de AED para árvores/DFS.
+        10. PriorityQueue, exceções, arquivos e projeto -> Dijkstra, NP-Complete, gulosos e programação dinâmica -> caps. 7, 8 e 9.
+
+        Quando possível, conecte três pontos: o recurso de Java/LP, o conceito de AED
+        e a parte correspondente do livro Entendendo Algoritmos, de Aditya Y. Bhargava.
+        Se o aluno pedir exercício, dê um de cada vez e não entregue a solução imediatamente.
+        """;
 
     private static final String SESSION_COOKIE = "studify_session";
     private static final long SESSION_TTL_MS = 30L * 24 * 60 * 60 * 1000;
@@ -71,6 +99,9 @@ public class Main {
         server.createContext("/api/notes", secured(Main::handleNotes));
         server.createContext("/api/sessions", secured(Main::handleSessions));
         server.createContext("/api/summary", secured(Main::handleSummary));
+        server.createContext("/api/study-roadmap", secured(Main::handleStudyRoadmap));
+        server.createContext("/api/tutor/history", secured(Main::handleTutorHistory));
+        server.createContext("/api/tutor/chat", secured(Main::handleTutorChat));
         server.createContext("/", Main::serveStatic);
 
         server.start();
@@ -80,7 +111,7 @@ public class Main {
         System.out.println("Porta: " + PORT);
         System.out.println("Banco principal: " + primaryDb.databasePath());
         System.out.println("Banco de " + SECOND_USER + ": " + secondDb.databasePath());
-        System.out.println("Banco de " + THIRD_USER + ": " + thirdDb.databasePath());
+        System.out.println("Tutor IA: " + (OPENAI_API_KEY.isBlank() ? "sem chave configurada" : "configurado"));
         System.out.println();
     }
 
@@ -109,24 +140,11 @@ public class Main {
             );
         }
 
-        if (THIRD_USER.isBlank() || THIRD_PASSWORD.isBlank()) {
-            throw new IllegalStateException(
-                "Defina STUDIFY_THIRD_USER e STUDIFY_THIRD_PASSWORD antes de iniciar o Studify."
-            );
-        }
-
-        if (THIRD_PASSWORD.length() < 8) {
-            throw new IllegalStateException(
-                "STUDIFY_THIRD_PASSWORD deve ter pelo menos 8 caracteres."
-            );
-        }
-
         Set<String> usernames = new HashSet<>();
         usernames.add(AUTH_USER.toLowerCase(Locale.ROOT));
         usernames.add(SECOND_USER.toLowerCase(Locale.ROOT));
-        usernames.add(THIRD_USER.toLowerCase(Locale.ROOT));
 
-        if (usernames.size() != 3) {
+        if (usernames.size() != 2) {
             throw new IllegalStateException("Os usuários do Studify precisam ter nomes diferentes.");
         }
     }
@@ -195,7 +213,6 @@ public class Main {
         try {
             primaryDb.studySummary();
             secondDb.studySummary();
-            thirdDb.studySummary();
             byte[] data = "ok".getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
             ex.sendResponseHeaders(200, data.length);
@@ -251,7 +268,8 @@ public class Main {
         boolean authenticated = session != null;
         json(ex, 200, Map.of(
             "authenticated", authenticated,
-            "username", authenticated ? session.username() : ""
+            "username", authenticated ? session.username() : "",
+            "primary", authenticated && session.username().equalsIgnoreCase(AUTH_USER)
         ));
     }
 
@@ -277,11 +295,6 @@ public class Main {
         if (constantTimeEquals(SECOND_USER, username)
                 && constantTimeEquals(SECOND_PASSWORD, password)) {
             return SECOND_USER;
-        }
-
-        if (constantTimeEquals(THIRD_USER, username)
-                && constantTimeEquals(THIRD_PASSWORD, password)) {
-            return THIRD_USER;
         }
 
         return null;
@@ -334,10 +347,6 @@ public class Main {
 
         if (session.username().equalsIgnoreCase(SECOND_USER)) {
             return secondDb;
-        }
-
-        if (session.username().equalsIgnoreCase(THIRD_USER)) {
-            return thirdDb;
         }
 
         return primaryDb;
@@ -657,6 +666,239 @@ public class Main {
     }
 
 
+    private static boolean ensurePrimaryUser(HttpExchange ex) throws IOException {
+        SessionData session = authenticatedSession(ex);
+        if (session == null || !session.username().equalsIgnoreCase(AUTH_USER)) {
+            json(ex, 403, Map.of(
+                "error", "Este recurso está disponível apenas no perfil robertof7b."
+            ));
+            return false;
+        }
+        return true;
+    }
+
+    private static void handleStudyRoadmap(HttpExchange ex) throws IOException {
+        if (!ensurePrimaryUser(ex)) return;
+
+        try {
+            String method = ex.getRequestMethod().toUpperCase(Locale.ROOT);
+
+            if ("GET".equals(method)) {
+                json(ex, 200, Map.of("progress", primaryDb.roadmapProgress()));
+                return;
+            }
+
+            if ("PUT".equals(method)) {
+                RoadmapProgressRequest body = gson.fromJson(
+                    readBody(ex),
+                    RoadmapProgressRequest.class
+                );
+
+                if (body == null || body.itemKey() == null) {
+                    json(ex, 400, Map.of("error", "Item de roadmap inválido."));
+                    return;
+                }
+
+                primaryDb.setRoadmapProgress(body.itemKey(), body.completed());
+                json(ex, 200, Map.of("ok", true));
+                return;
+            }
+
+            methodNotAllowed(ex);
+        } catch (Exception e) {
+            json(ex, 400, Map.of("error", safeMessage(e)));
+        }
+    }
+
+    private static void handleTutorHistory(HttpExchange ex) throws IOException {
+        if (!ensurePrimaryUser(ex)) return;
+
+        try {
+            String method = ex.getRequestMethod().toUpperCase(Locale.ROOT);
+
+            if ("GET".equals(method)) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("configured", !OPENAI_API_KEY.isBlank());
+                result.put("model", OPENAI_MODEL);
+                result.put("messages", primaryDb.chatHistory(60));
+                json(ex, 200, result);
+                return;
+            }
+
+            if ("DELETE".equals(method)) {
+                primaryDb.clearChatHistory();
+                json(ex, 200, Map.of("ok", true));
+                return;
+            }
+
+            methodNotAllowed(ex);
+        } catch (Exception e) {
+            json(ex, 400, Map.of("error", safeMessage(e)));
+        }
+    }
+
+    private static void handleTutorChat(HttpExchange ex) throws IOException {
+        if (!ensurePrimaryUser(ex)) return;
+
+        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+            methodNotAllowed(ex);
+            return;
+        }
+
+        if (OPENAI_API_KEY.isBlank()) {
+            json(ex, 503, Map.of(
+                "error",
+                "Tutor IA ainda não configurado. Adicione OPENAI_API_KEY nas variáveis de ambiente do Studify."
+            ));
+            return;
+        }
+
+        try {
+            TutorChatRequest body = gson.fromJson(readBody(ex), TutorChatRequest.class);
+            String message = body == null || body.message() == null
+                ? ""
+                : body.message().trim();
+
+            if (message.isBlank()) {
+                json(ex, 400, Map.of("error", "Digite uma mensagem para o tutor."));
+                return;
+            }
+
+            if (message.length() > 6000) {
+                json(ex, 400, Map.of("error", "A mensagem está muito longa."));
+                return;
+            }
+
+            List<Database.ChatMessage> history = primaryDb.chatHistory(14);
+            String reply = callOpenAI(history, message);
+
+            primaryDb.addChatMessage("user", message);
+            primaryDb.addChatMessage("assistant", reply);
+
+            json(ex, 200, Map.of(
+                "reply", reply,
+                "model", OPENAI_MODEL
+            ));
+        } catch (Exception e) {
+            json(ex, 502, Map.of("error", safeOpenAIMessage(e)));
+        }
+    }
+
+    private static String callOpenAI(
+        List<Database.ChatMessage> history,
+        String message
+    ) throws Exception {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", OPENAI_MODEL);
+        requestBody.addProperty("instructions", TUTOR_INSTRUCTIONS);
+        requestBody.addProperty("max_output_tokens", 1200);
+        requestBody.addProperty("store", false);
+
+        JsonArray input = new JsonArray();
+
+        for (Database.ChatMessage previous : history) {
+            JsonObject item = new JsonObject();
+            item.addProperty("role", previous.role());
+            item.addProperty("content", previous.content());
+            input.add(item);
+        }
+
+        JsonObject current = new JsonObject();
+        current.addProperty("role", "user");
+        current.addProperty("content", message);
+        input.add(current);
+
+        requestBody.add("input", input);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.openai.com/v1/responses"))
+            .timeout(Duration.ofSeconds(75))
+            .header("Authorization", "Bearer " + OPENAI_API_KEY)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(
+                gson.toJson(requestBody),
+                StandardCharsets.UTF_8
+            ))
+            .build();
+
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("A chamada ao Tutor IA foi interrompida.");
+        }
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException(extractOpenAIError(response.body()));
+        }
+
+        String text = extractOpenAIText(response.body());
+        if (text.isBlank()) {
+            throw new RuntimeException("A OpenAI não retornou uma resposta de texto.");
+        }
+
+        return text.trim();
+    }
+
+    private static String extractOpenAIText(String responseBody) {
+        JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
+        StringBuilder text = new StringBuilder();
+
+        JsonArray output = root.has("output") && root.get("output").isJsonArray()
+            ? root.getAsJsonArray("output")
+            : new JsonArray();
+
+        for (JsonElement outputElement : output) {
+            if (!outputElement.isJsonObject()) continue;
+            JsonObject outputItem = outputElement.getAsJsonObject();
+            if (!outputItem.has("content") || !outputItem.get("content").isJsonArray()) continue;
+
+            for (JsonElement contentElement : outputItem.getAsJsonArray("content")) {
+                if (!contentElement.isJsonObject()) continue;
+                JsonObject content = contentElement.getAsJsonObject();
+                String type = content.has("type") ? content.get("type").getAsString() : "";
+
+                if ("output_text".equals(type) && content.has("text")) {
+                    if (!text.isEmpty()) text.append("\n");
+                    text.append(content.get("text").getAsString());
+                } else if ("refusal".equals(type) && content.has("refusal")) {
+                    if (!text.isEmpty()) text.append("\n");
+                    text.append(content.get("refusal").getAsString());
+                }
+            }
+        }
+
+        return text.toString();
+    }
+
+    private static String extractOpenAIError(String responseBody) {
+        try {
+            JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
+            if (root.has("error") && root.get("error").isJsonObject()) {
+                JsonObject error = root.getAsJsonObject("error");
+                if (error.has("message")) {
+                    return "OpenAI: " + error.get("message").getAsString();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return "Não foi possível obter resposta do Tutor IA.";
+    }
+
+    private static String safeOpenAIMessage(Exception e) {
+        String message = safeMessage(e);
+        if (message.contains("401") || message.toLowerCase(Locale.ROOT).contains("api key")) {
+            return "A chave OPENAI_API_KEY não foi aceita. Verifique a variável no ambiente.";
+        }
+        return message;
+    }
+
+
     private static void serveStatic(HttpExchange ex) throws IOException {
         applySecurityHeaders(ex);
 
@@ -838,5 +1080,12 @@ public class Main {
         Integer subjectId,
         int durationSeconds
     ) {}
+
+    public record RoadmapProgressRequest(
+        String itemKey,
+        boolean completed
+    ) {}
+
+    public record TutorChatRequest(String message) {}
 
 }
