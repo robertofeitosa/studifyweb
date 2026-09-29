@@ -1,17 +1,13 @@
-FROM maven:3.9.11-eclipse-temurin-17 AS build
+FROM node:20-bookworm-slim
+
 WORKDIR /app
 
-COPY pom.xml ./
-RUN mvn -q -DskipTests dependency:go-offline
+COPY package.json ./
+RUN npm install
 
-COPY src ./src
-RUN mvn -q -DskipTests package
+COPY . .
+RUN npm run build
 
-FROM eclipse-temurin:17-jre-jammy
-WORKDIR /app
+ENV NODE_ENV=production
 
-COPY --from=build /app/target/Studify.jar /app/Studify.jar
-
-EXPOSE 8080
-
-CMD ["java", "-jar", "/app/Studify.jar"]
+CMD ["npm", "start"]
