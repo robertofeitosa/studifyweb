@@ -1,0 +1,25 @@
+{
+  "name": "studifyweb",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Studify com frontend HTML/CSS/JS e backend TypeScript",
+  "scripts": {
+    "dev": "tsx watch src-ts/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist-ts/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
