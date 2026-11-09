@@ -28,6 +28,9 @@ public class Main {
     private static final String AUTH_PASSWORD =
         System.getenv().getOrDefault("STUDIFY_PASSWORD", "");
 
+    private static final String AUTH_PASSWORD_SHA256 =
+        System.getenv().getOrDefault("STUDIFY_PASSWORD_SHA256", "").trim();
+
     private static final int MAX_PDF_BYTES = 15 * 1024 * 1024;
 
     private static final Database primaryDb = new Database();
@@ -74,15 +77,21 @@ public class Main {
     }
 
     private static void validateConfiguration() {
-        if (AUTH_USER.isBlank() || AUTH_PASSWORD.isBlank()) {
+        if (AUTH_USER.isBlank() || (AUTH_PASSWORD.isBlank() && AUTH_PASSWORD_SHA256.isBlank())) {
             throw new IllegalStateException(
-                "Defina STUDIFY_USER e STUDIFY_PASSWORD antes de iniciar o Studify."
+                "Defina STUDIFY_USER e uma senha do Studify antes de iniciar."
             );
         }
 
-        if (AUTH_PASSWORD.length() < 8) {
+        if (!AUTH_PASSWORD.isBlank() && AUTH_PASSWORD.length() < 8) {
             throw new IllegalStateException(
                 "STUDIFY_PASSWORD deve ter pelo menos 8 caracteres."
+            );
+        }
+
+        if (!AUTH_PASSWORD_SHA256.isBlank() && !AUTH_PASSWORD_SHA256.matches("(?i)^[a-f0-9]{64}$")) {
+            throw new IllegalStateException(
+                "STUDIFY_PASSWORD_SHA256 precisa ser um hash SHA-256 hexadecimal."
             );
         }
     }
@@ -319,6 +328,32 @@ public class Main {
         }
 
         ex.getResponseHeaders().add("Set-Cookie", cookie.toString());
+    }
+
+    private static boolean passwordMatches(String candidate) {
+        if (!AUTH_PASSWORD.isBlank()) {
+            return constantTimeEquals(AUTH_PASSWORD, candidate);
+        }
+
+        String candidateHash = sha256Hex(candidate);
+        return constantTimeEquals(
+            AUTH_PASSWORD_SHA256.toLowerCase(Locale.ROOT),
+            candidateHash
+        );
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 indisponível.", e);
+        }
     }
 
     private static boolean constantTimeEquals(String expected, String actual) {
