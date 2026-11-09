@@ -28,16 +28,9 @@ public class Main {
     private static final String AUTH_PASSWORD =
         System.getenv().getOrDefault("STUDIFY_PASSWORD", "");
 
-    private static final String SECOND_USER =
-        System.getenv().getOrDefault("STUDIFY_SECOND_USER", "julia").trim();
-
-    private static final String SECOND_PASSWORD =
-        System.getenv().getOrDefault("STUDIFY_SECOND_PASSWORD", "");
-
     private static final int MAX_PDF_BYTES = 15 * 1024 * 1024;
 
     private static final Database primaryDb = new Database();
-    private static final Database secondDb = new Database("studify-julia.db", false);
 
     private static final String SESSION_COOKIE = "studify_session";
     private static final long SESSION_TTL_MS = 30L * 24 * 60 * 60 * 1000;
@@ -77,7 +70,6 @@ public class Main {
         System.out.println("Studify iniciado com acesso privado.");
         System.out.println("Porta: " + PORT);
         System.out.println("Banco principal: " + primaryDb.databasePath());
-        System.out.println("Banco de " + SECOND_USER + ": " + secondDb.databasePath());
         System.out.println();
     }
 
@@ -92,26 +84,6 @@ public class Main {
             throw new IllegalStateException(
                 "STUDIFY_PASSWORD deve ter pelo menos 8 caracteres."
             );
-        }
-
-        if (SECOND_USER.isBlank() || SECOND_PASSWORD.isBlank()) {
-            throw new IllegalStateException(
-                "Defina STUDIFY_SECOND_USER e STUDIFY_SECOND_PASSWORD antes de iniciar o Studify."
-            );
-        }
-
-        if (SECOND_PASSWORD.length() < 8) {
-            throw new IllegalStateException(
-                "STUDIFY_SECOND_PASSWORD deve ter pelo menos 8 caracteres."
-            );
-        }
-
-        Set<String> usernames = new HashSet<>();
-        usernames.add(AUTH_USER.toLowerCase(Locale.ROOT));
-        usernames.add(SECOND_USER.toLowerCase(Locale.ROOT));
-
-        if (usernames.size() != 2) {
-            throw new IllegalStateException("Os usuários do Studify precisam ter nomes diferentes.");
         }
     }
 
@@ -178,7 +150,6 @@ public class Main {
 
         try {
             primaryDb.studySummary();
-            secondDb.studySummary();
             byte[] data = "ok".getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
             ex.sendResponseHeaders(200, data.length);
@@ -258,10 +229,6 @@ public class Main {
             return AUTH_USER;
         }
 
-        if (constantTimeEquals(SECOND_USER, username)
-                && constantTimeEquals(SECOND_PASSWORD, password)) {
-            return SECOND_USER;
-        }
 
         return null;
     }
@@ -311,9 +278,6 @@ public class Main {
             throw new IllegalStateException("Sessão inválida.");
         }
 
-        if (session.username().equalsIgnoreCase(SECOND_USER)) {
-            return secondDb;
-        }
 
         return primaryDb;
     }
