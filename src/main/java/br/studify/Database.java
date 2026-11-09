@@ -41,26 +41,67 @@ public class Database {
 
         String value = raw.trim();
 
-        if (value.startsWith("postgresql://")) {
-            value = "jdbc:postgresql://" + value.substring("postgresql://".length());
-        } else if (value.startsWith("postgres://")) {
-            value = "jdbc:postgresql://" + value.substring("postgres://".length());
+        if (value.startsWith("jdbc:postgresql://")) {
+            return value
+                .replace("?channel_binding=require&", "?")
+                .replace("&channel_binding=require", "")
+                .replace("?channel_binding=require", "");
         }
 
-        value = value
-            .replace("?channel_binding=require&", "?")
-            .replace("&channel_binding=require", "")
-            .replace("?channel_binding=require", "");
-
-        if (value.endsWith("?")) {
-            value = value.substring(0, value.length() - 1);
-        }
-
-        if (!value.startsWith("jdbc:postgresql://")) {
+        if (!value.startsWith("postgresql://") && !value.startsWith("postgres://")) {
             throw new IllegalStateException("DATABASE_URL precisa apontar para PostgreSQL.");
         }
 
-        return value;
+        try {
+            URI uri = URI.create(value);
+            String host = uri.getHost();
+            int port = uri.getPort();
+            String path = uri.getRawPath() == null ? "" : uri.getRawPath();
+            String query = uri.getRawQuery();
+            String userInfo = uri.getRawUserInfo();
+
+            if (host == null || host.isBlank()) {
+                throw new IllegalStateException("Host PostgreSQL inválido.");
+            }
+
+            StringBuilder jdbc = new StringBuilder("jdbc:postgresql://")
+                .append(host);
+
+            if (port > 0) {
+                jdbc.append(":").append(port);
+            }
+
+            jdbc.append(path);
+
+            List<String> params = new ArrayList<>();
+
+            if (query != null && !query.isBlank()) {
+                for (String part : query.split("&")) {
+                    if (!part.startsWith("channel_binding=") && !part.isBlank()) {
+                        params.add(part);
+                    }
+                }
+            }
+
+            if (userInfo != null && !userInfo.isBlank()) {
+                String[] pieces = userInfo.split(":", 2);
+                String user = URLDecoder.decode(pieces[0], StandardCharsets.UTF_8);
+                params.add("user=" + URLEncoder.encode(user, StandardCharsets.UTF_8));
+
+                if (pieces.length > 1) {
+                    String password = URLDecoder.decode(pieces[1], StandardCharsets.UTF_8);
+                    params.add("password=" + URLEncoder.encode(password, StandardCharsets.UTF_8));
+                }
+            }
+
+            if (!params.isEmpty()) {
+                jdbc.append("?").append(String.join("&", params));
+            }
+
+            return jdbc.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("DATABASE_URL PostgreSQL inválida.", e);
+        }
     }
 
     private Connection connect() throws SQLException {
