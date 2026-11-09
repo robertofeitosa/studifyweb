@@ -1,4 +1,4 @@
-name: Build Studify
+name: Build and test Studify
 
 on:
   push:
@@ -11,6 +11,22 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: studify
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studify"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,3 +40,28 @@ jobs:
 
       - name: Build
         run: mvn -B -DskipTests package
+
+      - name: Start Studify with PostgreSQL
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/studify?user=postgres
+          STUDIFY_USER: robertof7b
+          STUDIFY_PASSWORD: "${{ github.run_id }}-integration"
+          PORT: "8080"
+        run: |
+          java -jar target/Studify.jar > studify.log 2>&1 &
+          echo $! > studify.pid
+
+      - name: Verify health and seed migration
+        run: |
+          for i in {1..30}; do
+            if [ "$(curl -fsS http://127.0.0.1:8080/health || true)" = "ok" ]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat studify.log
+          exit 1
+
+      - name: Show startup log
+        if: always()
+        run: cat studify.log || true
