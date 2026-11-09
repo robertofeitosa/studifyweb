@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public class Database {
-    private final Path databasePath;
     private final String url;
 
     public Database() {
