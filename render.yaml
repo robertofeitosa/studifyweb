@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: studify-roberto
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: STUDIFY_USER
+        value: robertof7b
+      - key: STUDIFY_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false
