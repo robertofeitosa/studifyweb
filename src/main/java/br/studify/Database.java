@@ -13,80 +13,200 @@ public class Database {
     private final String url;
 
     public Database() {
-        this("studify.db", true);
+        this(true);
     }
 
-    public Database(String fileName, boolean seedFromTemplate) {
-        this.databasePath = resolveDatabasePath(fileName);
-        this.url = "jdbc:sqlite:" + databasePath.toAbsolutePath();
-        initializeDatabaseFile(seedFromTemplate);
+    public Database(String ignoredFileName, boolean seedFromTemplate) {
+        this(seedFromTemplate);
+    }
+
+    private Database(boolean seedFromTemplate) {
+        this.url = normalizeDatabaseUrl(System.getenv("DATABASE_URL"));
         createTables();
+
+        if (seedFromTemplate) {
+            importBundledSeedIfEmpty();
+        }
+
         normalizeOrders();
     }
 
     public String databasePath() {
-        return databasePath.toAbsolutePath().toString();
+        return "PostgreSQL remoto";
     }
 
-    private static Path resolveDatabasePath(String fileName) {
-        String explicitPath = System.getenv("DB_PATH");
-        if (explicitPath != null && !explicitPath.isBlank()) {
-            Path configured = Path.of(explicitPath);
-            if ("studify.db".equals(fileName)) {
-                return configured;
-            }
-
-            Path parent = configured.toAbsolutePath().getParent();
-            return parent == null ? Path.of(fileName) : parent.resolve(fileName);
+    private static String normalizeDatabaseUrl(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalStateException("Defina DATABASE_URL para conectar ao PostgreSQL.");
         }
 
-        String volumePath = System.getenv("RAILWAY_VOLUME_MOUNT_PATH");
-        if (volumePath != null && !volumePath.isBlank()) {
-            return Path.of(volumePath, fileName);
+        String value = raw.trim();
+
+        if (value.startsWith("postgresql://")) {
+            value = "jdbc:postgresql://" + value.substring("postgresql://".length());
+        } else if (value.startsWith("postgres://")) {
+            value = "jdbc:postgresql://" + value.substring("postgres://".length());
         }
 
-        return Path.of(fileName);
-    }
+        value = value
+            .replace("?channel_binding=require&", "?")
+            .replace("&channel_binding=require", "")
+            .replace("?channel_binding=require", "");
 
-    private void initializeDatabaseFile(boolean seedFromTemplate) {
-        try {
-            Path parent = databasePath.toAbsolutePath().getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-
-            if (Files.exists(databasePath)) {
-                return;
-            }
-
-            if (!seedFromTemplate) {
-                return;
-            }
-
-            try (InputStream seed = Database.class.getResourceAsStream("/seed/studify.db")) {
-                if (seed != null) {
-                    Files.copy(seed, databasePath, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Erro ao preparar banco: " + e.getMessage(), e);
+        if (value.endsWith("?")) {
+            value = value.substring(0, value.length() - 1);
         }
+
+        if (!value.startsWith("jdbc:postgresql://")) {
+            throw new IllegalStateException("DATABASE_URL precisa apontar para PostgreSQL.");
+        }
+
+        return value;
     }
 
     private Connection connect() throws SQLException {
-        Connection c = DriverManager.getConnection(url);
-        try (Statement s = c.createStatement()) {
-            s.execute("PRAGMA foreign_keys = ON");
-            s.execute("PRAGMA busy_timeout = 5000");
+        return DriverManager.getConnection(url);
+    }
+
+    private void importBundledSeedIfEmpty() {
+        try (Connection c = connect();
+             Statement s = c.createStatement();
+             ResultSet r = s.executeQuery("SELECT COUNT(*) FROM subjects")) {
+
+            if (r.next() && r.getInt(1) > 0) {
+                return;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erro ao verificar banco inicial: " + e.getMessage(), e);
         }
-        return c;
+
+        Path temp = null;
+
+        try (InputStream seed = Database.class.getResourceAsStream("/seed/studify.db")) {
+            if (seed == null) {
+                return;
+            }
+
+            temp = Files.createTempFile("studify-seed-", ".db");
+            Files.copy(seed, temp, StandardCopyOption.REPLACE_EXISTING);
+
+            try (Connection sqlite = DriverManager.getConnection("jdbc:sqlite:" + temp.toAbsolutePath());
+                 Connection pg = connect()) {
+
+                pg.setAutoCommit(false);
+
+                try {
+                    for (String table : List.of(
+                        "subjects",
+                        "contents",
+                        "reviews",
+                        "notes",
+                        "study_sessions",
+                        "roadmap_progress",
+                        "documents"
+                    )) {
+                        copySeedTable(sqlite, pg, table);
+                    }
+
+                    resetSequence(pg, "subjects");
+                    resetSequence(pg, "contents");
+                    resetSequence(pg, "reviews");
+                    resetSequence(pg, "notes");
+                    resetSequence(pg, "study_sessions");
+                    resetSequence(pg, "documents");
+
+                    pg.commit();
+                } catch (Exception e) {
+                    pg.rollback();
+                    throw e;
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao importar dados iniciais: " + e.getMessage(), e);
+        } finally {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private void copySeedTable(Connection sqlite, Connection pg, String table) throws SQLException {
+        try (PreparedStatement check = sqlite.prepareStatement(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?")) {
+            check.setString(1, table);
+            try (ResultSet r = check.executeQuery()) {
+                if (!r.next()) {
+                    return;
+                }
+            }
+        }
+
+        try (Statement source = sqlite.createStatement();
+             ResultSet rows = source.executeQuery("SELECT * FROM " + table)) {
+
+            ResultSetMetaData meta = rows.getMetaData();
+            int count = meta.getColumnCount();
+
+            List<String> columns = new ArrayList<>();
+            for (int i = 1; i <= count; i++) {
+                columns.add(meta.getColumnName(i));
+            }
+
+            String placeholders = String.join(", ", Collections.nCopies(count, "?"));
+            String sql = "INSERT INTO " + table + " (" +
+                String.join(", ", columns) + ") VALUES (" + placeholders + ") ON CONFLICT DO NOTHING";
+
+            try (PreparedStatement target = pg.prepareStatement(sql)) {
+                while (rows.next()) {
+                    for (int i = 1; i <= count; i++) {
+                        Object value = rows.getObject(i);
+
+                        if (value == null) {
+                            target.setObject(i, null);
+                            continue;
+                        }
+
+                        int type = meta.getColumnType(i);
+
+                        if (type == Types.BLOB || type == Types.BINARY ||
+                                type == Types.VARBINARY || type == Types.LONGVARBINARY) {
+                            target.setBytes(i, rows.getBytes(i));
+                        } else if (type == Types.INTEGER || type == Types.SMALLINT ||
+                                type == Types.TINYINT) {
+                            target.setInt(i, rows.getInt(i));
+                        } else if (type == Types.BIGINT) {
+                            target.setLong(i, rows.getLong(i));
+                        } else {
+                            target.setString(i, rows.getString(i));
+                        }
+                    }
+
+                    target.addBatch();
+                }
+
+                target.executeBatch();
+            }
+        }
+    }
+
+    private void resetSequence(Connection c, String table) throws SQLException {
+        String sql = "SELECT setval(pg_get_serial_sequence('" + table + "', 'id'), " +
+            "COALESCE((SELECT MAX(id) FROM " + table + "), 1), " +
+            "EXISTS(SELECT 1 FROM " + table + "))";
+
+        try (Statement s = c.createStatement()) {
+            s.execute(sql);
+        }
     }
 
     private void createTables() {
         try (Connection c = connect(); Statement s = c.createStatement()) {
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS subjects (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL UNIQUE,
                     position INTEGER NOT NULL DEFAULT 0
                 )
@@ -94,7 +214,7 @@ public class Database {
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS contents (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     subject_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'Não iniciado',
@@ -105,7 +225,7 @@ public class Database {
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS reviews (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     content_id INTEGER NOT NULL,
                     review_date TEXT NOT NULL,
                     completed INTEGER NOT NULL DEFAULT 0,
@@ -115,7 +235,7 @@ public class Database {
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS notes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     subject_id INTEGER,
                     title TEXT NOT NULL,
                     body TEXT NOT NULL,
@@ -127,7 +247,7 @@ public class Database {
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS study_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     subject_id INTEGER,
                     duration_seconds INTEGER NOT NULL,
                     studied_at TEXT NOT NULL,
@@ -145,11 +265,11 @@ public class Database {
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS documents (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
                     size_bytes INTEGER NOT NULL,
                     uploaded_at TEXT NOT NULL,
-                    data BLOB NOT NULL
+                    data BYTEA NOT NULL
                 )
             """);
         } catch (SQLException e) {
@@ -831,16 +951,15 @@ public class Database {
              PreparedStatement p = c.prepareStatement("""
                  INSERT INTO documents(name, size_bytes, uploaded_at, data)
                  VALUES(?, ?, ?, ?)
-             """)) {
+             """, Statement.RETURN_GENERATED_KEYS)) {
             p.setString(1, safeName);
             p.setLong(2, data.length);
             p.setString(3, LocalDateTime.now().toString());
             p.setBytes(4, data);
             p.executeUpdate();
 
-            try (Statement s = c.createStatement();
-                 ResultSet r = s.executeQuery("SELECT last_insert_rowid()")) {
-                return r.next() ? r.getInt(1) : -1;
+            try (ResultSet keys = p.getGeneratedKeys()) {
+                return keys.next() ? keys.getInt(1) : -1;
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
