@@ -234,10 +234,9 @@ public class Main {
 
     private static String authenticate(String username, String password) {
         if (constantTimeEquals(AUTH_USER, username)
-                && constantTimeEquals(AUTH_PASSWORD, password)) {
+                && passwordMatches(password)) {
             return AUTH_USER;
         }
-
 
         return null;
     }
