@@ -64,6 +64,11 @@ public class Database {
     }
 
     private Connection connect() throws SQLException {
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new SQLException("Driver PostgreSQL não encontrado.", e);
+        }
         return DriverManager.getConnection(url);
     }
 
@@ -88,6 +93,8 @@ public class Database {
 
             temp = Files.createTempFile("studify-seed-", ".db");
             Files.copy(seed, temp, StandardCopyOption.REPLACE_EXISTING);
+
+            Class.forName("org.sqlite.JDBC");
 
             try (Connection sqlite = DriverManager.getConnection("jdbc:sqlite:" + temp.toAbsolutePath());
                  Connection pg = connect()) {
